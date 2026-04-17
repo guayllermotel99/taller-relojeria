@@ -1,0 +1,1465 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Taller de Relojería</title>
+<link rel="manifest" href="manifest.json">
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #F5F2EC;
+    --bg2: #EDEAE2;
+    --bg3: #E4E0D6;
+    --surface: #FDFCF9;
+    --border: #D4CFC3;
+    --border2: #C2BCB0;
+    --text: #1A1814;
+    --text2: #5C5748;
+    --text3: #8C8578;
+    --accent: #2B4D3F;
+    --accent2: #3D6B5A;
+    --accent-light: #E8F0EC;
+    --accent-text: #FDFCF9;
+    --danger: #8B2E2E;
+    --danger-light: #F5EAEA;
+    --warning: #7A5C1E;
+    --warning-light: #F5F0E4;
+    --success: #2B4D3F;
+    --success-light: #E8F0EC;
+    --radius: 8px;
+    --radius-lg: 14px;
+    --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.05);
+    --shadow-lg: 0 4px 16px rgba(0,0,0,0.1), 0 8px 32px rgba(0,0,0,0.07);
+    --font-display: 'DM Serif Display', serif;
+    --font-body: 'DM Sans', sans-serif;
+    --font-mono: 'DM Mono', monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--font-body);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 15px;
+    line-height: 1.6;
+  }
+
+  /* LAYOUT */
+  .app { display: flex; flex-direction: column; min-height: 100vh; }
+
+  header {
+    background: var(--accent);
+    color: var(--accent-text);
+    padding: 0 24px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  }
+
+  .logo {
+    font-family: var(--font-display);
+    font-size: 20px;
+    letter-spacing: 0.01em;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .logo-icon {
+    width: 28px; height: 28px;
+    border: 2px solid rgba(255,255,255,0.4);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+  }
+
+  .user-info {
+    font-size: 13px;
+    opacity: 0.8;
+    font-family: var(--font-mono);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .btn-signout {
+    background: rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.25);
+    color: white;
+    padding: 4px 12px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    font-size: 12px;
+    font-family: var(--font-body);
+    transition: background 0.2s;
+  }
+  .btn-signout:hover { background: rgba(255,255,255,0.25); }
+
+  nav {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+    display: flex;
+    gap: 0;
+    overflow-x: auto;
+  }
+
+  .nav-tab {
+    padding: 14px 20px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text2);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+    white-space: nowrap;
+    background: none;
+    border-top: none;
+    border-left: none;
+    border-right: none;
+    font-family: var(--font-body);
+  }
+  .nav-tab:hover { color: var(--accent); }
+  .nav-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  main { flex: 1; padding: 24px; max-width: 1100px; margin: 0 auto; width: 100%; }
+
+  /* PANELS */
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  /* AUTH SCREEN */
+  #auth-screen {
+    position: fixed; inset: 0;
+    background: var(--accent);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 999;
+    flex-direction: column;
+    gap: 32px;
+  }
+
+  .auth-card {
+    background: var(--surface);
+    border-radius: var(--radius-lg);
+    padding: 48px;
+    text-align: center;
+    max-width: 380px;
+    width: 90%;
+    box-shadow: var(--shadow-lg);
+  }
+
+  .auth-title {
+    font-family: var(--font-display);
+    font-size: 32px;
+    color: var(--text);
+    margin-bottom: 8px;
+  }
+
+  .auth-sub {
+    color: var(--text2);
+    font-size: 14px;
+    margin-bottom: 32px;
+  }
+
+  .btn-google {
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    width: 100%;
+    padding: 14px 20px;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: var(--radius);
+    font-size: 15px;
+    font-family: var(--font-body);
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+  }
+  .btn-google:hover { background: var(--accent2); transform: translateY(-1px); }
+  .btn-google:active { transform: translateY(0); }
+
+  /* CARDS & LISTS */
+  .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .section-title {
+    font-family: var(--font-display);
+    font-size: 26px;
+    color: var(--text);
+  }
+
+  .btn {
+    padding: 10px 18px;
+    border-radius: var(--radius);
+    font-size: 14px;
+    font-family: var(--font-body);
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: white;
+  }
+  .btn-primary:hover { background: var(--accent2); transform: translateY(-1px); }
+
+  .btn-secondary {
+    background: var(--bg2);
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .btn-secondary:hover { background: var(--bg3); }
+
+  .btn-danger {
+    background: var(--danger-light);
+    color: var(--danger);
+    border: 1px solid #E8C8C8;
+  }
+  .btn-danger:hover { background: #EDD8D8; }
+
+  .btn-sm { padding: 6px 12px; font-size: 13px; }
+
+  .search-bar {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+
+  .search-input {
+    flex: 1;
+    padding: 10px 14px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 14px;
+    font-family: var(--font-body);
+    background: var(--surface);
+    color: var(--text);
+    transition: border-color 0.2s;
+  }
+  .search-input:focus { outline: none; border-color: var(--accent); }
+
+  .list-container {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    box-shadow: var(--shadow);
+  }
+
+  .list-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: background 0.15s;
+    gap: 12px;
+  }
+  .list-item:last-child { border-bottom: none; }
+  .list-item:hover { background: var(--bg); }
+
+  .list-item-main { flex: 1; min-width: 0; }
+
+  .list-item-name {
+    font-weight: 500;
+    font-size: 15px;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .list-item-sub {
+    font-size: 13px;
+    color: var(--text2);
+    margin-top: 2px;
+    font-family: var(--font-mono);
+  }
+
+  .list-item-actions {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  .badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+    font-family: var(--font-mono);
+    white-space: nowrap;
+  }
+
+  .badge-particular { background: var(--bg2); color: var(--text2); }
+  .badge-tienda { background: var(--accent-light); color: var(--accent); }
+  .badge-relojero { background: var(--warning-light); color: var(--warning); }
+
+  .empty-state {
+    text-align: center;
+    padding: 48px 24px;
+    color: var(--text3);
+  }
+
+  .empty-state-icon { font-size: 36px; margin-bottom: 12px; }
+  .empty-state-text { font-size: 15px; }
+
+  /* MODAL */
+  .modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(26,24,20,0.5);
+    z-index: 200;
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+  }
+  .modal-overlay.open { opacity: 1; pointer-events: all; }
+
+  .modal {
+    background: var(--surface);
+    border-radius: var(--radius-lg);
+    width: 100%;
+    max-width: 560px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: var(--shadow-lg);
+    transform: translateY(16px);
+    transition: transform 0.2s;
+  }
+  .modal-overlay.open .modal { transform: translateY(0); }
+
+  .modal-header {
+    padding: 24px 28px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .modal-title {
+    font-family: var(--font-display);
+    font-size: 22px;
+    color: var(--text);
+  }
+
+  .modal-close {
+    background: none;
+    border: none;
+    font-size: 20px;
+    cursor: pointer;
+    color: var(--text3);
+    padding: 4px;
+    line-height: 1;
+    transition: color 0.2s;
+  }
+  .modal-close:hover { color: var(--text); }
+
+  .modal-body { padding: 24px 28px; }
+
+  .modal-footer {
+    padding: 16px 28px 24px;
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+  }
+
+  /* FORM */
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .form-grid .full { grid-column: 1 / -1; }
+
+  .form-group { display: flex; flex-direction: column; gap: 6px; }
+
+  .form-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text2);
+  }
+
+  .form-input, .form-select, .form-textarea {
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 14px;
+    font-family: var(--font-body);
+    background: var(--bg);
+    color: var(--text);
+    transition: border-color 0.2s;
+    width: 100%;
+  }
+  .form-input:focus, .form-select:focus, .form-textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+    background: var(--surface);
+  }
+
+  .form-textarea { resize: vertical; min-height: 80px; }
+
+  .form-select { cursor: pointer; }
+
+  /* DETALLE CLIENTE */
+  .detail-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    box-shadow: var(--shadow);
+    margin-bottom: 24px;
+  }
+
+  .detail-header {
+    background: var(--accent);
+    color: white;
+    padding: 20px 24px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
+  .detail-header-title { font-family: var(--font-display); font-size: 24px; }
+  .detail-header-sub { font-size: 13px; opacity: 0.75; margin-top: 4px; font-family: var(--font-mono); }
+
+  .detail-header-actions { display: flex; gap: 8px; flex-shrink: 0; }
+
+  .btn-header {
+    background: rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.3);
+    color: white;
+    padding: 8px 14px;
+    border-radius: var(--radius);
+    font-size: 13px;
+    font-family: var(--font-body);
+    cursor: pointer;
+    transition: background 0.2s;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .btn-header:hover { background: rgba(255,255,255,0.25); }
+
+  .detail-body { padding: 24px; }
+
+  .detail-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  .detail-field {}
+  .detail-field-label { font-size: 12px; color: var(--text3); margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .detail-field-value { font-size: 15px; color: var(--text); }
+  .detail-field-value.mono { font-family: var(--font-mono); font-size: 14px; }
+  .detail-field-value.empty { color: var(--text3); font-style: italic; }
+
+  .subsection-title {
+    font-family: var(--font-display);
+    font-size: 20px;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  /* RELOJ CARD */
+  .reloj-card {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-bottom: 10px;
+  }
+  .reloj-card:hover { background: var(--bg2); border-color: var(--border2); }
+  .reloj-card:last-child { margin-bottom: 0; }
+
+  .reloj-card-main { flex: 1; min-width: 0; }
+  .reloj-card-marca { font-weight: 500; font-size: 15px; }
+  .reloj-card-modelo { font-size: 13px; color: var(--text2); margin-top: 2px; }
+  .reloj-card-ref { font-size: 12px; color: var(--text3); font-family: var(--font-mono); margin-top: 4px; }
+
+  .reloj-clase-badge {
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    background: var(--bg3);
+    color: var(--text2);
+    white-space: nowrap;
+  }
+
+  /* BREADCRUMB */
+  .breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--text3);
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+  .breadcrumb-link {
+    color: var(--accent);
+    cursor: pointer;
+    text-decoration: none;
+  }
+  .breadcrumb-link:hover { text-decoration: underline; }
+  .breadcrumb-sep { color: var(--border2); }
+
+  /* TOAST */
+  .toast-container {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    z-index: 999;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .toast {
+    background: var(--text);
+    color: var(--surface);
+    padding: 12px 18px;
+    border-radius: var(--radius);
+    font-size: 14px;
+    box-shadow: var(--shadow-lg);
+    animation: slideIn 0.25s ease;
+    max-width: 320px;
+  }
+
+  .toast.success { background: var(--accent); }
+  .toast.error { background: var(--danger); }
+
+  @keyframes slideIn {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+
+  /* LOADING */
+  .loading {
+    text-align: center;
+    padding: 32px;
+    color: var(--text3);
+    font-size: 14px;
+  }
+
+  .spinner {
+    display: inline-block;
+    width: 20px; height: 20px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    margin-right: 8px;
+    vertical-align: middle;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* CONFIRM DIALOG */
+  .confirm-overlay {
+    position: fixed; inset: 0;
+    background: rgba(26,24,20,0.5);
+    z-index: 300;
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+  }
+  .confirm-overlay.open { opacity: 1; pointer-events: all; }
+
+  .confirm-box {
+    background: var(--surface);
+    border-radius: var(--radius-lg);
+    padding: 28px;
+    max-width: 380px;
+    width: 100%;
+    box-shadow: var(--shadow-lg);
+  }
+
+  .confirm-title { font-weight: 500; font-size: 17px; margin-bottom: 10px; }
+  .confirm-text { font-size: 14px; color: var(--text2); margin-bottom: 24px; }
+  .confirm-actions { display: flex; gap: 10px; justify-content: flex-end; }
+
+  /* RESPONSIVE */
+  @media (max-width: 600px) {
+    main { padding: 16px; }
+    .form-grid { grid-template-columns: 1fr; }
+    .modal { max-height: 95vh; }
+    .detail-grid { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- AUTH SCREEN -->
+<div id="auth-screen">
+  <div class="auth-card">
+    <div class="auth-title">Taller de Relojería</div>
+    <div class="auth-sub">Accede con tu cuenta de Google para continuar</div>
+    <button class="btn-google" onclick="handleSignIn()">
+      <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#fff" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z"/><path fill="#fff" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/><path fill="#fff" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"/><path fill="#fff" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 6.29C4.672 4.163 6.656 3.58 9 3.58z"/></svg>
+      Entrar con Google
+    </button>
+  </div>
+</div>
+
+<!-- APP -->
+<div class="app" id="app" style="display:none">
+  <header>
+    <div class="logo">
+      <div class="logo-icon">⌚</div>
+      Taller de Relojería
+    </div>
+    <div class="user-info">
+      <span id="user-email"></span>
+      <button class="btn-signout" onclick="handleSignOut()">Salir</button>
+    </div>
+  </header>
+
+  <nav>
+    <button class="nav-tab active" onclick="showPanel('clientes')">Clientes</button>
+    <button class="nav-tab" onclick="showPanel('relojes')">Relojes</button>
+    <button class="nav-tab" onclick="showPanel('reparaciones')" style="opacity:0.5;pointer-events:none">Reparaciones</button>
+    <button class="nav-tab" onclick="showPanel('pedidos')" style="opacity:0.5;pointer-events:none">Pedidos</button>
+    <button class="nav-tab" onclick="showPanel('consultas')" style="opacity:0.5;pointer-events:none">Consultas</button>
+  </nav>
+
+  <main>
+    <!-- PANEL CLIENTES -->
+    <div id="panel-clientes" class="panel active">
+      <div id="clientes-list-view">
+        <div class="section-header">
+          <div class="section-title">Clientes</div>
+          <button class="btn btn-primary" onclick="abrirModalCliente()">+ Nuevo cliente</button>
+        </div>
+        <div class="search-bar">
+          <input type="text" class="search-input" placeholder="Buscar por nombre, teléfono o DNI..." id="search-clientes" oninput="filtrarClientes()">
+        </div>
+        <div class="list-container" id="lista-clientes">
+          <div class="loading"><span class="spinner"></span> Cargando clientes...</div>
+        </div>
+      </div>
+      <div id="clientes-detail-view" style="display:none"></div>
+    </div>
+
+    <!-- PANEL RELOJES (vista global) -->
+    <div id="panel-relojes" class="panel">
+      <div class="section-header">
+        <div class="section-title">Todos los relojes</div>
+        <button class="btn btn-primary" onclick="abrirModalReloj(null)">+ Nuevo reloj</button>
+      </div>
+      <div class="search-bar">
+        <input type="text" class="search-input" placeholder="Buscar por marca, modelo o referencia..." id="search-relojes" oninput="filtrarRelojes()">
+      </div>
+      <div class="list-container" id="lista-relojes-global">
+        <div class="loading"><span class="spinner"></span> Cargando relojes...</div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- MODAL CLIENTE -->
+<div class="modal-overlay" id="modal-cliente">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-cliente-title">Nuevo cliente</div>
+      <button class="modal-close" onclick="cerrarModal('modal-cliente')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group full">
+          <label class="form-label">Tipo de cliente *</label>
+          <select class="form-select" id="c-tipo">
+            <option value="Particular">Particular</option>
+            <option value="Relojero/Tienda">Relojero / Tienda</option>
+          </select>
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Nombre completo *</label>
+          <input type="text" class="form-input" id="c-nombre" placeholder="Nombre y apellidos">
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Nombre del comercio</label>
+          <input type="text" class="form-input" id="c-comercio" placeholder="Solo si es relojero/tienda">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Teléfono</label>
+          <input type="tel" class="form-input" id="c-telefono" placeholder="600 000 000">
+        </div>
+        <div class="form-group">
+          <label class="form-label">DNI / CIF</label>
+          <input type="text" class="form-input" id="c-dni" placeholder="00000000A">
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Email</label>
+          <input type="email" class="form-input" id="c-email" placeholder="correo@ejemplo.com">
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Dirección</label>
+          <input type="text" class="form-input" id="c-direccion" placeholder="Calle, número, ciudad">
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Anotaciones</label>
+          <textarea class="form-textarea" id="c-anotaciones" placeholder="Notas internas sobre el cliente..."></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="cerrarModal('modal-cliente')">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarCliente()">Guardar cliente</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL RELOJ -->
+<div class="modal-overlay" id="modal-reloj">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-reloj-title">Nuevo reloj</div>
+      <button class="modal-close" onclick="cerrarModal('modal-reloj')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group full" id="reloj-cliente-selector" style="display:none">
+          <label class="form-label">Cliente *</label>
+          <select class="form-select" id="r-cliente"></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Clase *</label>
+          <select class="form-select" id="r-clase">
+            <option value="Pulsera">Pulsera</option>
+            <option value="Bolsillo">Bolsillo</option>
+            <option value="Sobremesa">Sobremesa</option>
+            <option value="Pared">Pared</option>
+            <option value="Pie">Pie</option>
+            <option value="Otro">Otro</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Movimiento</label>
+          <select class="form-select" id="r-movimiento">
+            <option value="Cuarzo">Cuarzo</option>
+            <option value="Automático">Automático</option>
+            <option value="Manual">Manual</option>
+            <option value="Cuerda">Cuerda</option>
+            <option value="Digital">Digital</option>
+            <option value="Otro">Otro</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Marca</label>
+          <input type="text" class="form-input" id="r-marca" placeholder="Casio, Seiko, Omega...">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Modelo</label>
+          <input type="text" class="form-input" id="r-modelo" placeholder="Modelo del reloj">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Referencia</label>
+          <input type="text" class="form-input" id="r-referencia" placeholder="Ref. del fabricante">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Número de serie</label>
+          <input type="text" class="form-input" id="r-serie" placeholder="N/S">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Color de caja</label>
+          <input type="text" class="form-input" id="r-color" placeholder="Acero, dorado, negro...">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Material correa</label>
+          <input type="text" class="form-input" id="r-correa" placeholder="Piel, acero, caucho...">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Año aproximado</label>
+          <input type="text" class="form-input" id="r-anyo" placeholder="2010, años 80...">
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Descripción / características</label>
+          <textarea class="form-textarea" id="r-descripcion" placeholder="Detalles adicionales del reloj..."></textarea>
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Estado visual al entrar</label>
+          <textarea class="form-textarea" id="r-estado-visual" placeholder="Rasguños, golpes, estado de la correa..."></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="cerrarModal('modal-reloj')">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarReloj()">Guardar reloj</button>
+    </div>
+  </div>
+</div>
+
+<!-- CONFIRM -->
+<div class="confirm-overlay" id="confirm-overlay">
+  <div class="confirm-box">
+    <div class="confirm-title" id="confirm-title">¿Estás seguro?</div>
+    <div class="confirm-text" id="confirm-text"></div>
+    <div class="confirm-actions">
+      <button class="btn btn-secondary" onclick="cerrarConfirm()">Cancelar</button>
+      <button class="btn btn-danger" id="confirm-ok">Eliminar</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOASTS -->
+<div class="toast-container" id="toast-container"></div>
+
+<script>
+// ============================================================
+// CONFIG
+// ============================================================
+const CLIENT_ID = '76160976051-deg4u3k5d09jif11pea0gk3qi2cmecpk.apps.googleusercontent.com';
+const SHEET_ID  = '1AjeEMxgWksJrcf3qweAQua9frORSzsW8p7s0x_bsEYU';
+const SCOPES    = 'https://www.googleapis.com/auth/spreadsheets';
+const API_KEY   = ''; // No necesaria con OAuth
+
+// Cabeceras de cada hoja
+const HEADERS = {
+  Clientes: ['Id_Cliente','Codigo_Cliente','Tipo_Cliente','Nombre_Completo','Nombre_Comercio','Telefono','DNI_CIF','Direccion','Email','Anotaciones','Fecha_Modificacion'],
+  Relojes:  ['Id_Reloj','Id_Cliente','Fecha_Alta','Clase','Movimiento','Marca','Modelo','Referencia','Num_Serie','Color_Caja','Material_Correa','Anyo_Aprox','Descripcion','Estado_Visual'],
+  Reparaciones: ['Id_Reparacion','Id_Reloj','Fecha_Entrada','Descripcion_Problema','Observaciones_Internas','Precio_Presupuesto','Presupuesto_Aceptado','Estado','Fecha_Entrega_Estimada','Fecha_Entrega_Real','Recoge_Nombre','Recoge_DNI','Firma_Base64'],
+  Pedidos:  ['Id_Pedido','Id_Cliente','Id_Reloj','Id_Reparacion','Descripcion_Pieza','Referencia_Marca','Proveedor','Precio','Estado','Fecha_Pedido','Fecha_Llegada_Estimada','Fecha_Llegada_Real','Notas'],
+  Consultas:['Id_Consulta','Id_Cliente','Id_Reloj','Id_Reparacion','Asunto','Descripcion','Respuesta','Estado','Fecha_Consulta']
+};
+
+// ============================================================
+// ESTADO
+// ============================================================
+let tokenClient, accessToken;
+let clientes = [], relojes = [];
+let editandoClienteId = null, editandoRelojId = null;
+let clienteActivoId = null;
+
+// ============================================================
+// GOOGLE IDENTITY / AUTH
+// ============================================================
+function cargarGoogleScripts() {
+  const s1 = document.createElement('script');
+  s1.src = 'https://accounts.google.com/gsi/client';
+  s1.onload = initAuth;
+  document.head.appendChild(s1);
+
+  const s2 = document.createElement('script');
+  s2.src = 'https://apis.google.com/js/api.js';
+  s2.onload = () => gapi.load('client', initGapiClient);
+  document.head.appendChild(s2);
+}
+
+function initAuth() {
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: CLIENT_ID,
+    scope: SCOPES,
+    callback: async (resp) => {
+      if (resp.error) { toast('Error al autenticar', 'error'); return; }
+      accessToken = resp.access_token;
+      mostrarApp();
+      await inicializarHojas();
+      await cargarTodo();
+    }
+  });
+}
+
+async function initGapiClient() {
+  await gapi.client.init({ discoveryDocs: ['https://sheets.googleapis.com/$discovery/rest?version=v4'] });
+}
+
+function handleSignIn() {
+  if (!tokenClient) { toast('Cargando Google...', ''); return; }
+  tokenClient.requestAccessToken({ prompt: 'consent' });
+}
+
+function handleSignOut() {
+  if (accessToken) google.accounts.oauth2.revoke(accessToken);
+  accessToken = null;
+  document.getElementById('auth-screen').style.display = 'flex';
+  document.getElementById('app').style.display = 'none';
+}
+
+function mostrarApp() {
+  document.getElementById('auth-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+}
+
+// ============================================================
+// SHEETS API
+// ============================================================
+async function apiGet(range) {
+  const r = await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(range)}`,
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  );
+  const d = await r.json();
+  return d.values || [];
+}
+
+async function apiAppend(sheet, values) {
+  await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(sheet)}!A1:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ values: [values] })
+    }
+  );
+}
+
+async function apiUpdate(range, values) {
+  await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(range)}?valueInputOption=RAW`,
+    {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ values: [values] })
+    }
+  );
+}
+
+async function apiBatchUpdate(requests) {
+  await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}:batchUpdate`,
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ requests })
+    }
+  );
+}
+
+// ============================================================
+// INICIALIZAR HOJAS (cabeceras si están vacías)
+// ============================================================
+async function inicializarHojas() {
+  for (const [hoja, cabeceras] of Object.entries(HEADERS)) {
+    const data = await apiGet(`${hoja}!A1:A1`);
+    if (!data.length) {
+      await apiUpdate(`${hoja}!A1`, cabeceras);
+    }
+  }
+}
+
+// ============================================================
+// CARGAR DATOS
+// ============================================================
+async function cargarTodo() {
+  await Promise.all([cargarClientes(), cargarRelojes()]);
+}
+
+async function cargarClientes() {
+  const rows = await apiGet('Clientes!A2:K');
+  clientes = rows.map(r => ({
+    id: r[0]||'', codigo: r[1]||'', tipo: r[2]||'Particular',
+    nombre: r[3]||'', comercio: r[4]||'', telefono: r[5]||'',
+    dni: r[6]||'', direccion: r[7]||'', email: r[8]||'',
+    anotaciones: r[9]||'', fechaMod: r[10]||''
+  }));
+  renderizarListaClientes(clientes);
+}
+
+async function cargarRelojes() {
+  const rows = await apiGet('Relojes!A2:N');
+  relojes = rows.map(r => ({
+    id: r[0]||'', idCliente: r[1]||'', fechaAlta: r[2]||'',
+    clase: r[3]||'', movimiento: r[4]||'', marca: r[5]||'',
+    modelo: r[6]||'', referencia: r[7]||'', serie: r[8]||'',
+    colorCaja: r[9]||'', materialCorrea: r[10]||'', anyoAprox: r[11]||'',
+    descripcion: r[12]||'', estadoVisual: r[13]||''
+  }));
+  renderizarListaRelojosGlobal(relojes);
+}
+
+// ============================================================
+// UTILIDADES
+// ============================================================
+function uid() {
+  return Math.random().toString(36).substr(2,8);
+}
+
+function hoy() {
+  return new Date().toLocaleDateString('es-ES');
+}
+
+function codigoCliente(tipo) {
+  const prefijos = { 'Particular': 'CLI-PART', 'Relojero/Tienda': 'CLI-REL' };
+  const pref = prefijos[tipo] || 'CLI';
+  const num = String(clientes.length + 1).padStart(5, '0');
+  return `${pref}-${num}`;
+}
+
+function badgeTipo(tipo) {
+  const map = {
+    'Particular': 'badge-particular',
+    'Relojero/Tienda': 'badge-tienda'
+  };
+  return map[tipo] || 'badge-particular';
+}
+
+function val(id) { return document.getElementById(id)?.value?.trim() || ''; }
+
+// ============================================================
+// NAVEGACIÓN
+// ============================================================
+function showPanel(nombre) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById(`panel-${nombre}`)?.classList.add('active');
+  event.target.classList.add('active');
+}
+
+// ============================================================
+// CLIENTES — LISTA
+// ============================================================
+function renderizarListaClientes(lista) {
+  const el = document.getElementById('lista-clientes');
+  if (!lista.length) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-state-icon">👤</div><div class="empty-state-text">No hay clientes. ¡Añade el primero!</div></div>`;
+    return;
+  }
+  el.innerHTML = lista.map(c => `
+    <div class="list-item" onclick="verCliente('${c.id}')">
+      <div class="list-item-main">
+        <div class="list-item-name">${c.nombre}${c.comercio ? ` <span style="color:var(--text3);font-weight:400">· ${c.comercio}</span>` : ''}</div>
+        <div class="list-item-sub">${c.telefono || '—'} · ${c.dni || '—'} · ${c.codigo}</div>
+      </div>
+      <div class="list-item-actions">
+        <span class="badge ${badgeTipo(c.tipo)}">${c.tipo}</span>
+        <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();abrirModalCliente('${c.id}')">Editar</button>
+        <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();confirmarEliminarCliente('${c.id}','${c.nombre}')">✕</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function filtrarClientes() {
+  const q = document.getElementById('search-clientes').value.toLowerCase();
+  const filtrados = clientes.filter(c =>
+    c.nombre.toLowerCase().includes(q) ||
+    c.telefono.includes(q) ||
+    c.dni.toLowerCase().includes(q) ||
+    c.comercio.toLowerCase().includes(q) ||
+    c.email.toLowerCase().includes(q)
+  );
+  renderizarListaClientes(filtrados);
+}
+
+// ============================================================
+// CLIENTES — DETALLE
+// ============================================================
+function verCliente(id) {
+  clienteActivoId = id;
+  const c = clientes.find(x => x.id === id);
+  if (!c) return;
+  const relojesCliente = relojes.filter(r => r.idCliente === id);
+
+  const listView = document.getElementById('clientes-list-view');
+  const detailView = document.getElementById('clientes-detail-view');
+
+  listView.style.display = 'none';
+  detailView.style.display = 'block';
+
+  detailView.innerHTML = `
+    <div class="breadcrumb">
+      <span class="breadcrumb-link" onclick="volverAClientes()">Clientes</span>
+      <span class="breadcrumb-sep">›</span>
+      <span>${c.nombre}</span>
+    </div>
+
+    <div class="detail-card">
+      <div class="detail-header">
+        <div>
+          <div class="detail-header-title">${c.nombre}</div>
+          <div class="detail-header-sub">${c.codigo} · ${c.tipo}</div>
+        </div>
+        <div class="detail-header-actions">
+          <button class="btn-header" onclick="abrirModalCliente('${c.id}')">✎ Editar</button>
+        </div>
+      </div>
+      <div class="detail-body">
+        <div class="detail-grid">
+          <div class="detail-field">
+            <div class="detail-field-label">Teléfono</div>
+            <div class="detail-field-value mono">${c.telefono || '<span class="empty">—</span>'}</div>
+          </div>
+          <div class="detail-field">
+            <div class="detail-field-label">DNI / CIF</div>
+            <div class="detail-field-value mono">${c.dni || '<span class="empty">—</span>'}</div>
+          </div>
+          <div class="detail-field">
+            <div class="detail-field-label">Email</div>
+            <div class="detail-field-value">${c.email || '<span class="empty">—</span>'}</div>
+          </div>
+          <div class="detail-field">
+            <div class="detail-field-label">Comercio</div>
+            <div class="detail-field-value">${c.comercio || '<span class="empty">—</span>'}</div>
+          </div>
+          <div class="detail-field" style="grid-column:1/-1">
+            <div class="detail-field-label">Dirección</div>
+            <div class="detail-field-value">${c.direccion || '<span class="empty">—</span>'}</div>
+          </div>
+          ${c.anotaciones ? `
+          <div class="detail-field" style="grid-column:1/-1">
+            <div class="detail-field-label">Anotaciones</div>
+            <div class="detail-field-value">${c.anotaciones}</div>
+          </div>` : ''}
+        </div>
+
+        <div class="subsection-title">
+          Relojes <small style="font-size:14px;font-weight:400;color:var(--text3)">(${relojesCliente.length})</small>
+          <button class="btn btn-primary btn-sm" onclick="abrirModalReloj('${c.id}')">+ Añadir reloj</button>
+        </div>
+
+        <div id="relojes-cliente-${id}">
+          ${relojesCliente.length === 0
+            ? `<div class="empty-state" style="padding:24px"><div class="empty-state-text">Este cliente no tiene relojes registrados.</div></div>`
+            : relojesCliente.map(r => `
+              <div class="reloj-card" onclick="verReloj('${r.id}')">
+                <div class="reloj-card-main">
+                  <div class="reloj-card-marca">${r.marca || 'Sin marca'} ${r.modelo ? '· ' + r.modelo : ''}</div>
+                  <div class="reloj-card-modelo">${r.movimiento} · ${r.clase}</div>
+                  ${r.serie ? `<div class="reloj-card-ref">N/S: ${r.serie}</div>` : ''}
+                  ${r.referencia ? `<div class="reloj-card-ref">Ref: ${r.referencia}</div>` : ''}
+                </div>
+                <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px">
+                  <span class="reloj-clase-badge">${r.clase}</span>
+                  <div style="display:flex;gap:6px">
+                    <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();abrirModalReloj('${c.id}','${r.id}')">Editar</button>
+                    <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();confirmarEliminarReloj('${r.id}','${r.marca}')">✕</button>
+                  </div>
+                </div>
+              </div>
+            `).join('')
+          }
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function volverAClientes() {
+  clienteActivoId = null;
+  document.getElementById('clientes-list-view').style.display = 'block';
+  document.getElementById('clientes-detail-view').style.display = 'none';
+}
+
+function verReloj(id) {
+  // Próximamente: detalle de reloj con sus reparaciones
+  toast('Detalle de reloj — próximamente', '');
+}
+
+// ============================================================
+// CLIENTES — MODAL
+// ============================================================
+function abrirModalCliente(id = null) {
+  editandoClienteId = id;
+  const c = id ? clientes.find(x => x.id === id) : null;
+  document.getElementById('modal-cliente-title').textContent = c ? 'Editar cliente' : 'Nuevo cliente';
+
+  document.getElementById('c-tipo').value        = c?.tipo || 'Particular';
+  document.getElementById('c-nombre').value      = c?.nombre || '';
+  document.getElementById('c-comercio').value    = c?.comercio || '';
+  document.getElementById('c-telefono').value    = c?.telefono || '';
+  document.getElementById('c-dni').value         = c?.dni || '';
+  document.getElementById('c-email').value       = c?.email || '';
+  document.getElementById('c-direccion').value   = c?.direccion || '';
+  document.getElementById('c-anotaciones').value = c?.anotaciones || '';
+
+  abrirModal('modal-cliente');
+}
+
+async function guardarCliente() {
+  const nombre = val('c-nombre');
+  if (!nombre) { toast('El nombre es obligatorio', 'error'); return; }
+
+  const tipo      = val('c-tipo');
+  const comercio  = val('c-comercio');
+  const telefono  = val('c-telefono');
+  const dni       = val('c-dni');
+  const email     = val('c-email');
+  const direccion = val('c-direccion');
+  const anots     = val('c-anotaciones');
+  const fecha     = hoy();
+
+  if (editandoClienteId) {
+    // Buscar fila
+    const idx = clientes.findIndex(c => c.id === editandoClienteId);
+    const codigo = clientes[idx].codigo;
+    const row = idx + 2;
+    await apiUpdate(`Clientes!A${row}:K${row}`, [
+      editandoClienteId, codigo, tipo, nombre, comercio, telefono, dni, direccion, email, anots, fecha
+    ]);
+    clientes[idx] = { id: editandoClienteId, codigo, tipo, nombre, comercio, telefono, dni, direccion, email, anotaciones: anots, fechaMod: fecha };
+    toast('Cliente actualizado', 'success');
+  } else {
+    const id = uid();
+    const codigo = codigoCliente(tipo);
+    await apiAppend('Clientes', [id, codigo, tipo, nombre, comercio, telefono, dni, direccion, email, anots, fecha]);
+    clientes.push({ id, codigo, tipo, nombre, comercio, telefono, dni, direccion, email, anotaciones: anots, fechaMod: fecha });
+    toast('Cliente creado', 'success');
+  }
+
+  cerrarModal('modal-cliente');
+  renderizarListaClientes(clientes);
+  if (editandoClienteId && clienteActivoId === editandoClienteId) verCliente(editandoClienteId);
+}
+
+// ============================================================
+// RELOJES — LISTA GLOBAL
+// ============================================================
+function renderizarListaRelojosGlobal(lista) {
+  const el = document.getElementById('lista-relojes-global');
+  if (!lista.length) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-state-icon">⌚</div><div class="empty-state-text">No hay relojes registrados.</div></div>`;
+    return;
+  }
+  el.innerHTML = lista.map(r => {
+    const c = clientes.find(x => x.id === r.idCliente);
+    return `
+    <div class="list-item">
+      <div class="list-item-main">
+        <div class="list-item-name">${r.marca || 'Sin marca'} ${r.modelo ? '· ' + r.modelo : ''}</div>
+        <div class="list-item-sub">${r.clase} · ${r.movimiento}${r.serie ? ' · N/S: '+r.serie : ''}${c ? ' — '+c.nombre : ''}</div>
+      </div>
+      <div class="list-item-actions">
+        <button class="btn btn-secondary btn-sm" onclick="abrirModalReloj('${r.idCliente}','${r.id}')">Editar</button>
+        <button class="btn btn-danger btn-sm" onclick="confirmarEliminarReloj('${r.id}','${r.marca}')">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function filtrarRelojes() {
+  const q = document.getElementById('search-relojes').value.toLowerCase();
+  const filtrados = relojes.filter(r =>
+    r.marca.toLowerCase().includes(q) ||
+    r.modelo.toLowerCase().includes(q) ||
+    r.referencia.toLowerCase().includes(q) ||
+    r.serie.toLowerCase().includes(q)
+  );
+  renderizarListaRelojosGlobal(filtrados);
+}
+
+// ============================================================
+// RELOJES — MODAL
+// ============================================================
+function abrirModalReloj(idCliente = null, idReloj = null) {
+  editandoRelojId = idReloj;
+  const r = idReloj ? relojes.find(x => x.id === idReloj) : null;
+  document.getElementById('modal-reloj-title').textContent = r ? 'Editar reloj' : 'Nuevo reloj';
+
+  // Selector de cliente (solo si no viene de un cliente concreto)
+  const selectorCliente = document.getElementById('reloj-cliente-selector');
+  const selectCliente   = document.getElementById('r-cliente');
+
+  if (!idCliente) {
+    selectorCliente.style.display = 'block';
+    selectCliente.innerHTML = clientes.map(c =>
+      `<option value="${c.id}" ${r?.idCliente === c.id ? 'selected' : ''}>${c.nombre}</option>`
+    ).join('');
+  } else {
+    selectorCliente.style.display = 'none';
+    selectCliente.dataset.fijo = idCliente;
+  }
+
+  document.getElementById('r-clase').value       = r?.clase || 'Pulsera';
+  document.getElementById('r-movimiento').value  = r?.movimiento || 'Cuarzo';
+  document.getElementById('r-marca').value       = r?.marca || '';
+  document.getElementById('r-modelo').value      = r?.modelo || '';
+  document.getElementById('r-referencia').value  = r?.referencia || '';
+  document.getElementById('r-serie').value       = r?.serie || '';
+  document.getElementById('r-color').value       = r?.colorCaja || '';
+  document.getElementById('r-correa').value      = r?.materialCorrea || '';
+  document.getElementById('r-anyo').value        = r?.anyoAprox || '';
+  document.getElementById('r-descripcion').value = r?.descripcion || '';
+  document.getElementById('r-estado-visual').value = r?.estadoVisual || '';
+
+  abrirModal('modal-reloj');
+}
+
+async function guardarReloj() {
+  const selectorCliente = document.getElementById('reloj-cliente-selector');
+  const selectCliente   = document.getElementById('r-cliente');
+  const idCliente = selectorCliente.style.display === 'none'
+    ? selectCliente.dataset.fijo
+    : selectCliente.value;
+
+  if (!idCliente) { toast('Selecciona un cliente', 'error'); return; }
+
+  const clase      = val('r-clase');
+  const movimiento = val('r-movimiento');
+  const marca      = val('r-marca');
+  const modelo     = val('r-modelo');
+  const referencia = val('r-referencia');
+  const serie      = val('r-serie');
+  const colorCaja  = val('r-color');
+  const correa     = val('r-correa');
+  const anyo       = val('r-anyo');
+  const desc       = val('r-descripcion');
+  const estadoVis  = val('r-estado-visual');
+  const fecha      = hoy();
+
+  if (editandoRelojId) {
+    const idx = relojes.findIndex(r => r.id === editandoRelojId);
+    const row = idx + 2;
+    await apiUpdate(`Relojes!A${row}:N${row}`, [
+      editandoRelojId, idCliente, fecha, clase, movimiento, marca, modelo, referencia, serie, colorCaja, correa, anyo, desc, estadoVis
+    ]);
+    relojes[idx] = { id: editandoRelojId, idCliente, fechaAlta: fecha, clase, movimiento, marca, modelo, referencia, serie, colorCaja, materialCorrea: correa, anyoAprox: anyo, descripcion: desc, estadoVisual: estadoVis };
+    toast('Reloj actualizado', 'success');
+  } else {
+    const id = uid();
+    await apiAppend('Relojes', [id, idCliente, fecha, clase, movimiento, marca, modelo, referencia, serie, colorCaja, correa, anyo, desc, estadoVis]);
+    relojes.push({ id, idCliente, fechaAlta: fecha, clase, movimiento, marca, modelo, referencia, serie, colorCaja, materialCorrea: correa, anyoAprox: anyo, descripcion: desc, estadoVisual: estadoVis });
+    toast('Reloj añadido', 'success');
+  }
+
+  cerrarModal('modal-reloj');
+  renderizarListaRelojosGlobal(relojes);
+  if (clienteActivoId) verCliente(clienteActivoId);
+}
+
+// ============================================================
+// ELIMINAR
+// ============================================================
+function confirmarEliminarCliente(id, nombre) {
+  mostrarConfirm(
+    '¿Eliminar cliente?',
+    `Se eliminará a "${nombre}" y todos sus relojes asociados. Esta acción no se puede deshacer.`,
+    async () => {
+      await eliminarFilaPorId('Clientes', id, clientes);
+      clientes = clientes.filter(c => c.id !== id);
+      // Eliminar también sus relojes
+      const suyos = relojes.filter(r => r.idCliente === id);
+      for (const r of suyos) await eliminarFilaPorId('Relojes', r.id, relojes);
+      relojes = relojes.filter(r => r.idCliente !== id);
+      renderizarListaClientes(clientes);
+      renderizarListaRelojosGlobal(relojes);
+      if (clienteActivoId === id) volverAClientes();
+      toast('Cliente eliminado', 'success');
+    }
+  );
+}
+
+function confirmarEliminarReloj(id, marca) {
+  mostrarConfirm(
+    '¿Eliminar reloj?',
+    `Se eliminará el reloj "${marca || 'sin marca'}". Esta acción no se puede deshacer.`,
+    async () => {
+      await eliminarFilaPorId('Relojes', id, relojes);
+      relojes = relojes.filter(r => r.id !== id);
+      renderizarListaRelojosGlobal(relojes);
+      if (clienteActivoId) verCliente(clienteActivoId);
+      toast('Reloj eliminado', 'success');
+    }
+  );
+}
+
+async function eliminarFilaPorId(hoja, id, lista) {
+  // Obtener todas las filas para encontrar el número
+  const rows = await apiGet(`${hoja}!A2:A`);
+  const rowIdx = rows.findIndex(r => r[0] === id);
+  if (rowIdx === -1) return;
+  const sheetRow = rowIdx + 2; // +1 por cabecera, +1 por base 1
+
+  // Necesitamos el sheetId de la hoja
+  const sheetIdMap = await getSheetIds();
+  const sheetId = sheetIdMap[hoja];
+  if (sheetId === undefined) return;
+
+  await apiBatchUpdate([{
+    deleteDimension: {
+      range: { sheetId, dimension: 'ROWS', startIndex: sheetRow - 1, endIndex: sheetRow }
+    }
+  }]);
+}
+
+let _sheetIds = null;
+async function getSheetIds() {
+  if (_sheetIds) return _sheetIds;
+  const r = await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}?fields=sheets.properties`,
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  );
+  const d = await r.json();
+  _sheetIds = {};
+  for (const s of d.sheets) _sheetIds[s.properties.title] = s.properties.sheetId;
+  return _sheetIds;
+}
+
+// ============================================================
+// UI HELPERS
+// ============================================================
+function abrirModal(id) {
+  document.getElementById(id).classList.add('open');
+}
+
+function cerrarModal(id) {
+  document.getElementById(id).classList.remove('open');
+}
+
+let confirmCallback = null;
+function mostrarConfirm(title, text, cb) {
+  document.getElementById('confirm-title').textContent = title;
+  document.getElementById('confirm-text').textContent = text;
+  confirmCallback = cb;
+  document.getElementById('confirm-overlay').classList.add('open');
+  document.getElementById('confirm-ok').onclick = async () => {
+    cerrarConfirm();
+    await cb();
+  };
+}
+function cerrarConfirm() {
+  document.getElementById('confirm-overlay').classList.remove('open');
+}
+
+function toast(msg, tipo = '') {
+  const el = document.createElement('div');
+  el.className = `toast ${tipo}`;
+  el.textContent = msg;
+  document.getElementById('toast-container').appendChild(el);
+  setTimeout(() => el.remove(), 3000);
+}
+
+// Cerrar modales al clicar fuera
+document.addEventListener('click', e => {
+  if (e.target.classList.contains('modal-overlay')) {
+    e.target.classList.remove('open');
+  }
+  if (e.target.id === 'confirm-overlay') cerrarConfirm();
+});
+
+// ============================================================
+// INIT
+// ============================================================
+cargarGoogleScripts();
+</script>
+</body>
+</html>
