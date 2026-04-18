@@ -946,7 +946,7 @@ async function confirmarEntrega() {
 }
 
 // ============================================================
-// IMPRESIÓN — TICKETS 80mm / RAWBT
+// IMPRESIÓN — TICKETS ESC/POS 80mm / RAWBT
 // ============================================================
 var TALLER = {
   nombre:    'Repuesto Refer S.L.',
@@ -954,175 +954,228 @@ var TALLER = {
   telefono:  '640 238 819'
 };
 
-function linea80(char, n) {
-  return (char || '-').repeat(n || 42);
+// Ancho en caracteres para fuente normal en 80mm
+var ANCHO = 48;
+
+// Comandos ESC/POS
+var ESC = '\x1B';
+var GS  = '\x1D';
+
+var CMD = {
+  init:         ESC + '@',           // Inicializar impresora
+  boldOn:       ESC + 'E\x01',       // Negrita activada
+  boldOff:      ESC + 'E\x00',       // Negrita desactivada
+  bigOn:        GS  + '!\x11',       // Doble ancho + doble alto
+  bigOff:       GS  + '!\x00',       // Tamaño normal
+  centerOn:     ESC + 'a\x01',       // Centrar
+  centerOff:    ESC + 'a\x00',       // Alinear izquierda
+  cut:          GS  + 'V\x41\x03',   // Corte parcial con margen
+  feed:         ESC + 'd\x04'        // Avanzar 4 líneas antes de cortar
+};
+
+function linea(char) {
+  return (char || '-').repeat(ANCHO);
 }
 
-function centrar80(texto) {
-  var ancho = 42;
-  var t = String(texto||'').substring(0, ancho);
-  var pad = Math.floor((ancho - t.length) / 2);
+function centrar(texto) {
+  var t = String(texto||'').substring(0, ANCHO);
+  var pad = Math.floor((ANCHO - t.length) / 2);
   return ' '.repeat(pad) + t;
 }
 
-function generarHTMLTicketEntrada(rep) {
-  var reloj   = relojes.find(function(r) { return r.id === rep.idReloj; });
-  var cliente = reloj ? clientes.find(function(c) { return c.id === reloj.idCliente; }) : null;
-
-  var lineas = [
-    centrar80(TALLER.nombre),
-    centrar80(TALLER.direccion),
-    centrar80('Tel: ' + TALLER.telefono),
-    linea80('='),
-    centrar80('RESGUARDO DE ENTRADA'),
-    linea80('='),
-    'N° Reparacion: ' + (rep.numero||'—'),
-    'Fecha entrada: ' + (rep.fechaEntrada||'—'),
-    linea80('-'),
-    'CLIENTE',
-    'Nombre: ' + (cliente ? cliente.nombre : '—'),
-    'Tel:    ' + (cliente ? cliente.telefono||'—' : '—'),
-    'DNI:    ' + (cliente ? cliente.dni||'—' : '—'),
-    linea80('-'),
-    'RELOJ',
-    'Marca:  ' + (reloj ? reloj.marca||'—' : '—'),
-    'Modelo: ' + (reloj ? reloj.modelo||'—' : '—'),
-    'Serie:  ' + (reloj ? reloj.serie||'—' : '—'),
-    'Clase:  ' + (reloj ? reloj.clase||'—' : '—'),
-    linea80('-'),
-    'AVERIA / TRABAJO',
-  ].concat(
-    trocear(rep.problema||'—', 40)
-  ).concat([
-    rep.estadoVisual ? linea80('-') : null,
-    rep.estadoVisual ? 'ESTADO VISUAL AL ENTRAR' : null,
-  ]).concat(
-    rep.estadoVisual ? trocear(rep.estadoVisual, 40) : []
-  ).concat([
-    linea80('='),
-    centrar80('COPIA CLIENTE'),
-    linea80('='),
-    '',
-    'Firma del cliente:',
-    '',
-    '',
-    '_____________________________',
-    '',
-    linea80('='),
-    centrar80('** COPIA TALLER **'),
-    linea80('='),
-    'N° Reparacion: ' + (rep.numero||'—'),
-    'Cliente: ' + (cliente ? cliente.nombre : '—'),
-    'Tel:     ' + (cliente ? cliente.telefono||'—' : '—'),
-    'Reloj:   ' + (reloj ? (reloj.marca||'—') + ' ' + (reloj.modelo||'') : '—'),
-    linea80('-'),
-    'AVERIA',
-  ]).concat(
-    trocear(rep.problema||'—', 40)
-  ).concat([
-    linea80('='),
-    ''
-  ]);
-
-  return lineas.filter(function(l) { return l !== null; }).join('\n');
-}
-
-function generarHTMLTicketEntrega(rep) {
-  var reloj   = relojes.find(function(r) { return r.id === rep.idReloj; });
-  var cliente = reloj ? clientes.find(function(c) { return c.id === reloj.idCliente; }) : null;
-
-  var lineas = [
-    centrar80(TALLER.nombre),
-    centrar80(TALLER.direccion),
-    centrar80('Tel: ' + TALLER.telefono),
-    linea80('='),
-    centrar80('TICKET DE ENTREGA'),
-    linea80('='),
-    'N° Reparacion: ' + (rep.numero||'—'),
-    'Fecha entrega: ' + (rep.fechaEntregaReal||'—'),
-    linea80('-'),
-    'CLIENTE',
-    'Nombre: ' + (cliente ? cliente.nombre : '—'),
-    'Tel:    ' + (cliente ? cliente.telefono||'—' : '—'),
-    linea80('-'),
-    'RELOJ',
-    'Marca:  ' + (reloj ? reloj.marca||'—' : '—'),
-    'Modelo: ' + (reloj ? reloj.modelo||'—' : '—'),
-    linea80('-'),
-    'TRABAJO REALIZADO',
-  ].concat(
-    trocear(rep.problema||'—', 40)
-  ).concat([
-    rep.sinReparar === 'Sí' ? linea80('-') : null,
-    rep.sinReparar === 'Sí' ? 'ENTREGADO SIN REPARAR' : null,
-    rep.sinReparar === 'Sí' && rep.motivoSinReparar ? rep.motivoSinReparar : null,
-    linea80('-'),
-    'Recoge:  ' + (rep.recogeNombre||'—'),
-    rep.recogeDni ? 'DNI:     ' + rep.recogeDni : null,
-    linea80('='),
-    'IMPORTE: ' + (rep.precio ? rep.precio + ' EUR' : 'A CONSULTAR'),
-    linea80('='),
-    '',
-    'Firma de recogida:',
-    '',
-    '',
-    '_____________________________',
-    '',
-    centrar80('Gracias por su confianza'),
-    ''
-  ]);
-
-  return lineas.filter(function(l) { return l !== null; }).join('\n');
-}
-
 function trocear(texto, ancho) {
-  var palabras = texto.split(' ');
+  ancho = ancho || ANCHO;
+  var palabras = String(texto||'').split(' ');
   var lineas = [], actual = '';
   for (var i = 0; i < palabras.length; i++) {
     var p = palabras[i];
-    if ((actual + (actual?' ':'')+p).length <= ancho) {
-      actual = actual + (actual?' ':'')+p;
+    if ((actual + (actual ? ' ' : '') + p).length <= ancho) {
+      actual = actual + (actual ? ' ' : '') + p;
     } else {
       if (actual) lineas.push(actual);
-      actual = p;
+      actual = p.substring(0, ancho);
     }
   }
   if (actual) lineas.push(actual);
   return lineas;
 }
 
-function imprimirTicket(texto) {
-  // Intentar abrir con RawBT (app Android)
-  var contenido = encodeURIComponent(texto);
-  var urlRawbt = 'rawbt:' + contenido;
+function bold(texto) { return CMD.boldOn + texto + CMD.boldOff; }
+function big(texto)  { return CMD.bigOn  + texto + CMD.bigOff; }
 
-  // Detectar si es Android/móvil
+// ── RESGUARDO DE ENTRADA (copia cliente + copia taller) ─────
+function generarResguardoEntrada(rep) {
+  var reloj   = relojes.find(function(r) { return r.id === rep.idReloj; });
+  var cliente = reloj ? clientes.find(function(c) { return c.id === reloj.idCliente; }) : null;
+  var nombreC = cliente ? cliente.nombre    : '—';
+  var telC    = cliente ? cliente.telefono  || '—' : '—';
+  var dniC    = cliente ? cliente.dni       || '—' : '—';
+  var marcaR  = reloj   ? reloj.marca       || '—' : '—';
+  var modeloR = reloj   ? reloj.modelo      || ''  : '';
+  var serieR  = reloj   ? reloj.serie       || '—' : '—';
+  var claseR  = reloj   ? reloj.clase       || '—' : '—';
+
+  // ── COPIA CLIENTE ──────────────────────────────────────────
+  var ticket = CMD.init;
+  ticket += CMD.centerOn;
+  ticket += bold(TALLER.nombre) + '\n';
+  ticket += TALLER.direccion + '\n';
+  ticket += 'Tel: ' + TALLER.telefono + '\n';
+  ticket += linea('=') + '\n';
+  ticket += bold('  RESGUARDO DE ENTRADA') + '\n';
+  ticket += linea('=') + '\n';
+  ticket += CMD.centerOff;
+
+  // Número destacado
+  ticket += bold('N. Reparacion: ' + (rep.numero||'—')) + '\n';
+  ticket += 'Fecha entrada: ' + (rep.fechaEntrada||'—') + '\n';
+  ticket += linea('-') + '\n';
+
+  // Cliente — nombre y tel en negrita
+  ticket += 'CLIENTE\n';
+  ticket += bold('Nombre: ' + nombreC) + '\n';
+  ticket += bold('Tel:    ' + telC) + '\n';
+  ticket += 'DNI:    ' + dniC + '\n';
+  ticket += linea('-') + '\n';
+
+  // Reloj
+  ticket += 'RELOJ\n';
+  ticket += 'Marca:  ' + marcaR + (modeloR ? ' ' + modeloR : '') + '\n';
+  ticket += 'Serie:  ' + serieR + '\n';
+  ticket += 'Clase:  ' + claseR + '\n';
+  ticket += linea('-') + '\n';
+
+  // Avería
+  ticket += bold('AVERIA / TRABAJO A REALIZAR') + '\n';
+  trocear(rep.problema||'—', ANCHO).forEach(function(l) { ticket += l + '\n'; });
+
+  if (rep.estadoVisual) {
+    ticket += linea('-') + '\n';
+    ticket += 'Estado visual al entrar:\n';
+    trocear(rep.estadoVisual, ANCHO).forEach(function(l) { ticket += l + '\n'; });
+  }
+
+  ticket += linea('=') + '\n';
+  ticket += CMD.centerOn;
+  ticket += 'Gracias por su confianza\n';
+  ticket += CMD.centerOff;
+  ticket += CMD.feed;
+  ticket += CMD.cut;
+
+  // ── COPIA TALLER ───────────────────────────────────────────
+  ticket += CMD.centerOn;
+  ticket += bold('** COPIA TALLER **') + '\n';
+  ticket += linea('=') + '\n';
+  ticket += CMD.centerOff;
+
+  ticket += bold('N. Reparacion: ' + (rep.numero||'—')) + '\n';
+  ticket += 'Fecha: ' + (rep.fechaEntrada||'—') + '\n';
+  ticket += linea('-') + '\n';
+  ticket += bold('Cliente: ' + nombreC) + '\n';
+  ticket += bold('Tel:     ' + telC) + '\n';
+  ticket += 'Reloj:   ' + marcaR + (modeloR ? ' ' + modeloR : '') + '\n';
+  ticket += 'Serie:   ' + serieR + '\n';
+  ticket += linea('-') + '\n';
+  ticket += bold('AVERIA') + '\n';
+  trocear(rep.problema||'—', ANCHO).forEach(function(l) { ticket += l + '\n'; });
+  ticket += linea('=') + '\n';
+  ticket += CMD.feed;
+  ticket += CMD.cut;
+
+  return ticket;
+}
+
+// ── TICKET DE ENTREGA (solo cliente, sin firma) ─────────────
+function generarTicketEntrega(rep) {
+  var reloj   = relojes.find(function(r) { return r.id === rep.idReloj; });
+  var cliente = reloj ? clientes.find(function(c) { return c.id === reloj.idCliente; }) : null;
+  var nombreC = cliente ? cliente.nombre   : '—';
+  var telC    = cliente ? cliente.telefono || '—' : '—';
+  var marcaR  = reloj   ? reloj.marca      || '—' : '—';
+  var modeloR = reloj   ? reloj.modelo     || ''  : '';
+
+  var ticket = CMD.init;
+  ticket += CMD.centerOn;
+  ticket += bold(TALLER.nombre) + '\n';
+  ticket += TALLER.direccion + '\n';
+  ticket += 'Tel: ' + TALLER.telefono + '\n';
+  ticket += linea('=') + '\n';
+  ticket += bold('    TICKET DE ENTREGA') + '\n';
+  ticket += linea('=') + '\n';
+  ticket += CMD.centerOff;
+
+  ticket += bold('N. Reparacion: ' + (rep.numero||'—')) + '\n';
+  ticket += 'Fecha entrega: ' + (rep.fechaEntregaReal||'—') + '\n';
+  ticket += linea('-') + '\n';
+
+  ticket += 'CLIENTE\n';
+  ticket += bold('Nombre: ' + nombreC) + '\n';
+  ticket += bold('Tel:    ' + telC) + '\n';
+  ticket += linea('-') + '\n';
+
+  ticket += 'RELOJ\n';
+  ticket += 'Marca:  ' + marcaR + (modeloR ? ' ' + modeloR : '') + '\n';
+  ticket += linea('-') + '\n';
+
+  ticket += bold('TRABAJO REALIZADO') + '\n';
+  trocear(rep.problema||'—', ANCHO).forEach(function(l) { ticket += l + '\n'; });
+
+  if (rep.sinReparar === 'Sí') {
+    ticket += linea('-') + '\n';
+    ticket += bold('ENTREGADO SIN REPARAR') + '\n';
+    if (rep.motivoSinReparar) {
+      trocear(rep.motivoSinReparar, ANCHO).forEach(function(l) { ticket += l + '\n'; });
+    }
+  }
+
+  ticket += linea('-') + '\n';
+  ticket += 'Recoge: ' + (rep.recogeNombre||'—') + '\n';
+  if (rep.recogeDni) ticket += 'DNI:    ' + rep.recogeDni + '\n';
+
+  ticket += linea('=') + '\n';
+  ticket += CMD.centerOn;
+  ticket += bold('IMPORTE: ' + (rep.precio ? rep.precio + ' EUR' : 'A CONSULTAR')) + '\n';
+  ticket += linea('=') + '\n';
+  ticket += '\n';
+  ticket += 'Gracias por su confianza\n';
+  ticket += CMD.centerOff;
+  ticket += CMD.feed;
+  ticket += CMD.cut;
+
+  return ticket;
+}
+
+// ── ENVÍO A RAWBT / VISTA PREVIA ───────────────────────────
+function imprimirEscPos(datos) {
   var esMovil = /Android|iPhone|iPad/i.test(navigator.userAgent);
 
   if (esMovil) {
-    // En móvil: intentar RawBT, si falla mostrar el texto para copiar
-    var win = window.open(urlRawbt, '_blank');
-    // Fallback: también abrir vista de impresión por si RawBT no está instalado
-    setTimeout(function() {
-      abrirVistaPreviaTicket(texto);
-    }, 800);
+    // Codificar en base64 para RawBT
+    var b64 = btoa(unescape(encodeURIComponent(datos)));
+    var url = 'rawbt://base64/' + b64;
+    window.location.href = url;
   } else {
-    // En escritorio: mostrar vista previa imprimible
-    abrirVistaPreviaTicket(texto);
+    // En escritorio mostrar vista previa legible
+    abrirVistaPreviaTicket(datos);
   }
 }
 
-function abrirVistaPreviaTicket(texto) {
-  var win = window.open('', '_blank', 'width=400,height=700');
+function abrirVistaPreviaTicket(datos) {
+  // Limpiar comandos ESC/POS para mostrar texto legible en pantalla
+  var texto = datos
+    .replace(/\x1B[@Ea\x00\x01]|\x1BD\x04|\x1Bd\x04|\x1Ba[\x00\x01]|\x1BE[\x00\x01]|\x1D[!V][\x00\x11\x41\x03]/g, '')
+    .replace(/[^\x20-\x7E\xA0-\xFF\n]/g, '');
+
+  var win = window.open('', '_blank', 'width=420,height=750,menubar=no,toolbar=no');
+  if (!win) { toast('Permite las ventanas emergentes en el navegador', 'error'); return; }
   win.document.write(
-    '<!DOCTYPE html><html><head><meta charset="UTF-8">' +
-    '<title>Ticket</title>' +
+    '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Ticket</title>' +
     '<style>' +
-    'body{margin:0;padding:16px;background:#fff;font-family:"Courier New",monospace;font-size:11px;line-height:1.4;white-space:pre}' +
-    '@media print{body{padding:0}button{display:none}}' +
-    'button{display:block;width:100%;padding:10px;margin-bottom:12px;background:#2B4D3F;color:white;border:none;font-size:14px;cursor:pointer;border-radius:4px}' +
+    'body{margin:0;padding:12px 16px;background:#fff;font-family:"Courier New",Courier,monospace;font-size:13px;line-height:1.5;white-space:pre;word-break:break-all}' +
+    'button{display:block;width:100%;padding:10px;margin-bottom:14px;background:#2B4D3F;color:#fff;border:none;font-size:15px;cursor:pointer;border-radius:6px;font-family:sans-serif}' +
+    '@media print{button{display:none}body{font-size:11px;padding:0}}' +
     '</style></head><body>' +
-    '<button onclick="window.print()">Imprimir</button>' +
+    '<button onclick="window.print()">🖨 Imprimir</button>' +
     texto.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') +
     '</body></html>'
   );
@@ -1132,13 +1185,13 @@ function abrirVistaPreviaTicket(texto) {
 function imprimirResguardoEntrada(idReparacion) {
   var rep = reparaciones.find(function(r) { return r.id === idReparacion; });
   if (!rep) return;
-  imprimirTicket(generarHTMLTicketEntrada(rep));
+  imprimirEscPos(generarResguardoEntrada(rep));
 }
 
 function imprimirTicketEntrega(idReparacion) {
   var rep = reparaciones.find(function(r) { return r.id === idReparacion; });
   if (!rep) return;
-  imprimirTicket(generarHTMLTicketEntrega(rep));
+  imprimirEscPos(generarTicketEntrega(rep));
 }
 
 // ============================================================
