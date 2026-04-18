@@ -700,16 +700,19 @@
 
     <!-- PANEL RELOJES (vista global) -->
     <div id="panel-relojes" class="panel">
-      <div class="section-header">
-        <div class="section-title">Todos los relojes</div>
-        <button class="btn btn-primary" onclick="abrirModalReloj(null)">+ Nuevo reloj</button>
+      <div id="relojes-list-view">
+        <div class="section-header">
+          <div class="section-title">Todos los relojes</div>
+          <button class="btn btn-primary" onclick="abrirModalReloj(null)">+ Nuevo reloj</button>
+        </div>
+        <div class="search-bar">
+          <input type="text" class="search-input" placeholder="Buscar por marca, modelo o referencia..." id="search-relojes" oninput="filtrarRelojes()">
+        </div>
+        <div class="list-container" id="lista-relojes-global">
+          <div class="loading"><span class="spinner"></span> Cargando relojes...</div>
+        </div>
       </div>
-      <div class="search-bar">
-        <input type="text" class="search-input" placeholder="Buscar por marca, modelo o referencia..." id="search-relojes" oninput="filtrarRelojes()">
-      </div>
-      <div class="list-container" id="lista-relojes-global">
-        <div class="loading"><span class="spinner"></span> Cargando relojes...</div>
-      </div>
+      <div id="relojes-detail-view" style="display:none"></div>
     </div>
     <!-- PANEL REPARACIONES -->
     <div id="panel-reparaciones" class="panel">
@@ -883,8 +886,16 @@
         <div class="form-group full">
           <label class="form-label">Cliente *</label>
           <div style="display:flex;gap:8px;align-items:center">
-            <select class="form-select" id="rep-cliente" onchange="actualizarRelojesSelect(null)" style="flex:1"></select>
+            <div style="flex:1;position:relative">
+              <input type="text" class="form-input" id="rep-cliente-search" placeholder="Buscar por nombre, teléfono o DNI..." oninput="filtrarClientesModal()" autocomplete="off">
+              <div id="rep-cliente-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-lg);z-index:50;max-height:200px;overflow-y:auto;margin-top:4px"></div>
+              <input type="hidden" id="rep-cliente">
+            </div>
             <button type="button" class="btn btn-secondary btn-sm" onclick="mostrarCreacionRapidaCliente()" title="Crear cliente nuevo">+ Nuevo</button>
+          </div>
+          <div id="rep-cliente-seleccionado" style="display:none;margin-top:6px;font-size:13px;color:var(--accent);padding:4px 8px;background:var(--accent-light);border-radius:var(--radius);display:flex;align-items:center;justify-content:space-between">
+            <span id="rep-cliente-seleccionado-nombre"></span>
+            <button type="button" onclick="limpiarClienteSeleccionado()" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:14px;padding:0 2px">✕</button>
           </div>
         </div>
 
