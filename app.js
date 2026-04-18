@@ -8,7 +8,7 @@ const SCOPES    = 'https://www.googleapis.com/auth/spreadsheets';
 const HEADERS = {
   Clientes:     ['Id_Cliente','Codigo_Cliente','Tipo_Cliente','Nombre_Completo','Nombre_Comercio','Telefono','DNI_CIF','Direccion','Email','Anotaciones','Fecha_Modificacion'],
   Relojes:      ['Id_Reloj','Id_Cliente','Fecha_Alta','Clase','Movimiento','Marca','Modelo','Referencia','Num_Serie','Color_Caja','Material_Correa','Anyo_Aprox','Descripcion'],
-  Reparaciones: ['Id_Reparacion','Id_Reloj','Fecha_Entrada','Descripcion_Problema','Estado_Visual','Observaciones_Internas','Precio_Presupuesto','Presupuesto_Aceptado','Estado','Fecha_Entrega_Estimada','Fecha_Entrega_Real','Recoge_Nombre','Recoge_DNI','Sin_Reparar','Motivo_Sin_Reparar','Firma_Base64'],
+  Reparaciones: ['Id_Reparacion','Numero_Reparacion','Id_Reloj','Fecha_Entrada','Descripcion_Problema','Estado_Visual','Observaciones_Internas','Precio_Presupuesto','Presupuesto_Aceptado','Estado','Fecha_Entrega_Estimada','Fecha_Entrega_Real','Recoge_Nombre','Recoge_DNI','Sin_Reparar','Motivo_Sin_Reparar','Firma_Base64'],
   Pedidos:      ['Id_Pedido','Id_Cliente','Id_Reloj','Id_Reparacion','Descripcion_Pieza','Referencia_Marca','Proveedor','Precio','Estado','Fecha_Pedido','Fecha_Llegada_Estimada','Fecha_Llegada_Real','Notas'],
   Consultas:    ['Id_Consulta','Id_Cliente','Id_Reloj','Id_Reparacion','Asunto','Descripcion','Respuesta','Estado','Fecha_Consulta']
 };
@@ -159,14 +159,14 @@ async function cargarRelojes() {
 }
 
 async function cargarReparaciones() {
-  const rows = await apiGet('Reparaciones!A2:P');
+  const rows = await apiGet('Reparaciones!A2:Q');
   reparaciones = rows.map(function(r) { return {
-    id: r[0]||'', idReloj: r[1]||'', fechaEntrada: r[2]||'',
-    problema: r[3]||'', estadoVisual: r[4]||'', observaciones: r[5]||'',
-    precio: r[6]||'', presupuestoAceptado: r[7]||'', estado: r[8]||'',
-    fechaEstimada: r[9]||'', fechaEntregaReal: r[10]||'',
-    recogeNombre: r[11]||'', recogeDni: r[12]||'',
-    sinReparar: r[13]||'', motivoSinReparar: r[14]||'', firma: r[15]||''
+    id: r[0]||'', numero: r[1]||'', idReloj: r[2]||'', fechaEntrada: r[3]||'',
+    problema: r[4]||'', estadoVisual: r[5]||'', observaciones: r[6]||'',
+    precio: r[7]||'', presupuestoAceptado: r[8]||'', estado: r[9]||'',
+    fechaEstimada: r[10]||'', fechaEntregaReal: r[11]||'',
+    recogeNombre: r[12]||'', recogeDni: r[13]||'',
+    sinReparar: r[14]||'', motivoSinReparar: r[15]||'', firma: r[16]||''
   }; });
   renderizarListaReparaciones(reparaciones);
 }
@@ -372,7 +372,7 @@ function verReloj(id, desdePanel) {
         return '<div class="rep-card" onclick="verReparacion(\'' + rep.id + '\')">' +
           '<div class="rep-card-header">' +
             '<div>' +
-              '<div class="rep-card-title">' + (rep.problema||'Sin descripción').substring(0,70) + (rep.problema&&rep.problema.length>70?'...':'') + '</div>' +
+              '<div class="rep-card-title">' + (rep.numero ? '<span style="font-family:var(--font-mono);font-size:12px;color:var(--text3);margin-right:6px">' + rep.numero + '</span>' : '') + (rep.problema||'Sin descripción').substring(0,70) + (rep.problema&&rep.problema.length>70?'...':'') + '</div>' +
               '<div class="rep-card-sub">Entrada: ' + rep.fechaEntrada + (rep.fechaEstimada?' · Estimada: '+rep.fechaEstimada:'') + '</div>' +
             '</div>' +
             '<div class="rep-card-actions">' +
@@ -569,7 +569,7 @@ function renderizarListaReparaciones(lista) {
     var cliente = reloj ? clientes.find(function(c) { return c.id === reloj.idCliente; }) : null;
     return '<div class="list-item" onclick="verReparacion(\'' + rep.id + '\')">' +
       '<div class="list-item-main">' +
-        '<div class="list-item-name">' + (cliente?cliente.nombre:'—') + ' — ' + nombreReloj(reloj) + '</div>' +
+        '<div class="list-item-name">' + (rep.numero ? '<span style="font-family:var(--font-mono);font-size:13px;color:var(--text3);margin-right:8px">' + rep.numero + '</span>' : '') + (cliente?cliente.nombre:'—') + ' — ' + nombreReloj(reloj) + '</div>' +
         '<div class="list-item-sub">' + (rep.problema||'Sin descripción').substring(0,60) + (rep.problema&&rep.problema.length>60?'...':'') + '</div>' +
         '<div class="list-item-sub" style="margin-top:3px">' + rep.fechaEntrada + (rep.fechaEstimada?' · Estimada: '+rep.fechaEstimada:'') + '</div>' +
       '</div>' +
@@ -623,9 +623,11 @@ function verReparacion(id) {
       '<div class="detail-header">' +
         '<div>' +
           '<div class="detail-header-title">' + nombreReloj(reloj) + '</div>' +
-          '<div class="detail-header-sub">' + (cliente?cliente.nombre:'—') + ' · Entrada: ' + rep.fechaEntrada + '</div>' +
+          '<div class="detail-header-sub">' + (cliente?cliente.nombre:'—') + ' · ' + (rep.numero||rep.id) + ' · Entrada: ' + rep.fechaEntrada + '</div>' +
         '</div>' +
         '<div class="detail-header-actions">' +
+          '<button class="btn-header" onclick="imprimirResguardoEntrada(\'' + rep.id + '\')">🖨 Resguardo</button>' +
+          (rep.estado==='Entregada' ? '<button class="btn-header" onclick="imprimirTicketEntrega(\'' + rep.id + '\')">🖨 Entrega</button>' : '') +
           (rep.estado==='Lista para recoger' ? '<button class="btn-header" onclick="abrirModalEntrega(\'' + rep.id + '\')">📋 Entregar</button>' : '') +
           '<button class="btn-header" onclick="abrirModalReparacion(null,\'' + rep.id + '\')">✎ Editar</button>' +
         '</div>' +
@@ -822,6 +824,17 @@ async function guardarRelojRapido() {
   toast('Reloj "' + (marca||'nuevo') + '" creado', 'success');
 }
 
+function siguienteNumeroReparacion() {
+  var base = 70000;
+  if (!reparaciones.length) return 'REP-' + String(base + 1).padStart(6,'0');
+  var nums = reparaciones.map(function(r) {
+    var n = parseInt((r.numero||'').replace('REP-',''), 10);
+    return isNaN(n) ? 0 : n;
+  });
+  var max = Math.max.apply(null, nums);
+  return 'REP-' + String(Math.max(max, base) + 1).padStart(6,'0');
+}
+
 async function guardarReparacion() {
   var idReloj  = document.getElementById('rep-reloj').value;
   var problema = val('rep-problema');
@@ -834,18 +847,19 @@ async function guardarReparacion() {
   if (editandoReparacionId) {
     var idx = reparaciones.findIndex(function(r) { return r.id === editandoReparacionId; });
     var rep = reparaciones[idx];
-    await apiUpdate('Reparaciones!A' + (idx+2) + ':J' + (idx+2), [editandoReparacionId, idReloj, fechaEntrada, problema, estadoVisual, observaciones, precio, presupAceptado, estado, fechaEstimada]);
+    await apiUpdate('Reparaciones!A' + (idx+2) + ':K' + (idx+2), [editandoReparacionId, rep.numero, idReloj, fechaEntrada, problema, estadoVisual, observaciones, precio, presupAceptado, estado, fechaEstimada]);
     reparaciones[idx] = Object.assign({}, rep, { idReloj: idReloj, problema: problema, estadoVisual: estadoVisual, observaciones: observaciones, precio: precio, presupuestoAceptado: presupAceptado, estado: estado, fechaEstimada: fechaEstimada });
     toast('Reparación actualizada', 'success');
   } else {
     var newId = uid();
-    await apiAppend('Reparaciones', [newId, idReloj, fechaEntrada, problema, estadoVisual, observaciones, precio, presupAceptado, estado, fechaEstimada, '', '', '', '', '', '']);
-    reparaciones.push({ id: newId, idReloj: idReloj, fechaEntrada: fechaEntrada, problema: problema, estadoVisual: estadoVisual, observaciones: observaciones, precio: precio, presupuestoAceptado: presupAceptado, estado: estado, fechaEstimada: fechaEstimada, fechaEntregaReal: '', recogeNombre: '', recogeDni: '', sinReparar: '', motivoSinReparar: '', firma: '' });
-    toast('Reparación creada', 'success');
+    var numero = siguienteNumeroReparacion();
+    await apiAppend('Reparaciones', [newId, numero, idReloj, fechaEntrada, problema, estadoVisual, observaciones, precio, presupAceptado, estado, fechaEstimada, '', '', '', '', '', '']);
+    reparaciones.push({ id: newId, numero: numero, idReloj: idReloj, fechaEntrada: fechaEntrada, problema: problema, estadoVisual: estadoVisual, observaciones: observaciones, precio: precio, presupuestoAceptado: presupAceptado, estado: estado, fechaEstimada: fechaEstimada, fechaEntregaReal: '', recogeNombre: '', recogeDni: '', sinReparar: '', motivoSinReparar: '', firma: '' });
+    toast('Reparación ' + numero + ' creada', 'success');
   }
   cerrarModal('modal-reparacion');
   renderizarListaReparaciones(reparaciones);
-  if (relojActivoId) verReloj(relojActivoId);
+  if (relojActivoId) verReloj(relojActivoId, relojDesdePanel);
   if (reparacionActivaId && reparacionActivaId === editandoReparacionId) verReparacion(editandoReparacionId);
 }
 
@@ -918,8 +932,8 @@ async function confirmarEntrega() {
   var idx = reparaciones.findIndex(function(r) { return r.id === reparacionEntregaId; });
   if (idx === -1) return;
   var rep = reparaciones[idx];
-  await apiUpdate('Reparaciones!A' + (idx+2) + ':P' + (idx+2), [
-    rep.id, rep.idReloj, rep.fechaEntrada, rep.problema, rep.estadoVisual,
+  await apiUpdate('Reparaciones!A' + (idx+2) + ':Q' + (idx+2), [
+    rep.id, rep.numero, rep.idReloj, rep.fechaEntrada, rep.problema, rep.estadoVisual,
     rep.observaciones, rep.precio, rep.presupuestoAceptado, 'Entregada',
     rep.fechaEstimada, fechaReal, recogeNombre, recogeDni, sinReparar, motivo, firmaDataUrl
   ]);
@@ -929,6 +943,202 @@ async function confirmarEntrega() {
   if (relojActivoId) verReloj(relojActivoId);
   if (reparacionActivaId === reparacionEntregaId) verReparacion(reparacionEntregaId);
   toast('Entrega registrada correctamente', 'success');
+}
+
+// ============================================================
+// IMPRESIÓN — TICKETS 80mm / RAWBT
+// ============================================================
+var TALLER = {
+  nombre:    'Repuesto Refer S.L.',
+  direccion: 'Calle Atarazanas, 9',
+  telefono:  '640 238 819'
+};
+
+function linea80(char, n) {
+  return (char || '-').repeat(n || 42);
+}
+
+function centrar80(texto) {
+  var ancho = 42;
+  var t = String(texto||'').substring(0, ancho);
+  var pad = Math.floor((ancho - t.length) / 2);
+  return ' '.repeat(pad) + t;
+}
+
+function generarHTMLTicketEntrada(rep) {
+  var reloj   = relojes.find(function(r) { return r.id === rep.idReloj; });
+  var cliente = reloj ? clientes.find(function(c) { return c.id === reloj.idCliente; }) : null;
+
+  var lineas = [
+    centrar80(TALLER.nombre),
+    centrar80(TALLER.direccion),
+    centrar80('Tel: ' + TALLER.telefono),
+    linea80('='),
+    centrar80('RESGUARDO DE ENTRADA'),
+    linea80('='),
+    'N° Reparacion: ' + (rep.numero||'—'),
+    'Fecha entrada: ' + (rep.fechaEntrada||'—'),
+    linea80('-'),
+    'CLIENTE',
+    'Nombre: ' + (cliente ? cliente.nombre : '—'),
+    'Tel:    ' + (cliente ? cliente.telefono||'—' : '—'),
+    'DNI:    ' + (cliente ? cliente.dni||'—' : '—'),
+    linea80('-'),
+    'RELOJ',
+    'Marca:  ' + (reloj ? reloj.marca||'—' : '—'),
+    'Modelo: ' + (reloj ? reloj.modelo||'—' : '—'),
+    'Serie:  ' + (reloj ? reloj.serie||'—' : '—'),
+    'Clase:  ' + (reloj ? reloj.clase||'—' : '—'),
+    linea80('-'),
+    'AVERIA / TRABAJO',
+  ].concat(
+    trocear(rep.problema||'—', 40)
+  ).concat([
+    rep.estadoVisual ? linea80('-') : null,
+    rep.estadoVisual ? 'ESTADO VISUAL AL ENTRAR' : null,
+  ]).concat(
+    rep.estadoVisual ? trocear(rep.estadoVisual, 40) : []
+  ).concat([
+    linea80('='),
+    centrar80('COPIA CLIENTE'),
+    linea80('='),
+    '',
+    'Firma del cliente:',
+    '',
+    '',
+    '_____________________________',
+    '',
+    linea80('='),
+    centrar80('** COPIA TALLER **'),
+    linea80('='),
+    'N° Reparacion: ' + (rep.numero||'—'),
+    'Cliente: ' + (cliente ? cliente.nombre : '—'),
+    'Tel:     ' + (cliente ? cliente.telefono||'—' : '—'),
+    'Reloj:   ' + (reloj ? (reloj.marca||'—') + ' ' + (reloj.modelo||'') : '—'),
+    linea80('-'),
+    'AVERIA',
+  ]).concat(
+    trocear(rep.problema||'—', 40)
+  ).concat([
+    linea80('='),
+    ''
+  ]);
+
+  return lineas.filter(function(l) { return l !== null; }).join('\n');
+}
+
+function generarHTMLTicketEntrega(rep) {
+  var reloj   = relojes.find(function(r) { return r.id === rep.idReloj; });
+  var cliente = reloj ? clientes.find(function(c) { return c.id === reloj.idCliente; }) : null;
+
+  var lineas = [
+    centrar80(TALLER.nombre),
+    centrar80(TALLER.direccion),
+    centrar80('Tel: ' + TALLER.telefono),
+    linea80('='),
+    centrar80('TICKET DE ENTREGA'),
+    linea80('='),
+    'N° Reparacion: ' + (rep.numero||'—'),
+    'Fecha entrega: ' + (rep.fechaEntregaReal||'—'),
+    linea80('-'),
+    'CLIENTE',
+    'Nombre: ' + (cliente ? cliente.nombre : '—'),
+    'Tel:    ' + (cliente ? cliente.telefono||'—' : '—'),
+    linea80('-'),
+    'RELOJ',
+    'Marca:  ' + (reloj ? reloj.marca||'—' : '—'),
+    'Modelo: ' + (reloj ? reloj.modelo||'—' : '—'),
+    linea80('-'),
+    'TRABAJO REALIZADO',
+  ].concat(
+    trocear(rep.problema||'—', 40)
+  ).concat([
+    rep.sinReparar === 'Sí' ? linea80('-') : null,
+    rep.sinReparar === 'Sí' ? 'ENTREGADO SIN REPARAR' : null,
+    rep.sinReparar === 'Sí' && rep.motivoSinReparar ? rep.motivoSinReparar : null,
+    linea80('-'),
+    'Recoge:  ' + (rep.recogeNombre||'—'),
+    rep.recogeDni ? 'DNI:     ' + rep.recogeDni : null,
+    linea80('='),
+    'IMPORTE: ' + (rep.precio ? rep.precio + ' EUR' : 'A CONSULTAR'),
+    linea80('='),
+    '',
+    'Firma de recogida:',
+    '',
+    '',
+    '_____________________________',
+    '',
+    centrar80('Gracias por su confianza'),
+    ''
+  ]);
+
+  return lineas.filter(function(l) { return l !== null; }).join('\n');
+}
+
+function trocear(texto, ancho) {
+  var palabras = texto.split(' ');
+  var lineas = [], actual = '';
+  for (var i = 0; i < palabras.length; i++) {
+    var p = palabras[i];
+    if ((actual + (actual?' ':'')+p).length <= ancho) {
+      actual = actual + (actual?' ':'')+p;
+    } else {
+      if (actual) lineas.push(actual);
+      actual = p;
+    }
+  }
+  if (actual) lineas.push(actual);
+  return lineas;
+}
+
+function imprimirTicket(texto) {
+  // Intentar abrir con RawBT (app Android)
+  var contenido = encodeURIComponent(texto);
+  var urlRawbt = 'rawbt:' + contenido;
+
+  // Detectar si es Android/móvil
+  var esMovil = /Android|iPhone|iPad/i.test(navigator.userAgent);
+
+  if (esMovil) {
+    // En móvil: intentar RawBT, si falla mostrar el texto para copiar
+    var win = window.open(urlRawbt, '_blank');
+    // Fallback: también abrir vista de impresión por si RawBT no está instalado
+    setTimeout(function() {
+      abrirVistaPreviaTicket(texto);
+    }, 800);
+  } else {
+    // En escritorio: mostrar vista previa imprimible
+    abrirVistaPreviaTicket(texto);
+  }
+}
+
+function abrirVistaPreviaTicket(texto) {
+  var win = window.open('', '_blank', 'width=400,height=700');
+  win.document.write(
+    '<!DOCTYPE html><html><head><meta charset="UTF-8">' +
+    '<title>Ticket</title>' +
+    '<style>' +
+    'body{margin:0;padding:16px;background:#fff;font-family:"Courier New",monospace;font-size:11px;line-height:1.4;white-space:pre}' +
+    '@media print{body{padding:0}button{display:none}}' +
+    'button{display:block;width:100%;padding:10px;margin-bottom:12px;background:#2B4D3F;color:white;border:none;font-size:14px;cursor:pointer;border-radius:4px}' +
+    '</style></head><body>' +
+    '<button onclick="window.print()">Imprimir</button>' +
+    texto.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') +
+    '</body></html>'
+  );
+  win.document.close();
+}
+
+function imprimirResguardoEntrada(idReparacion) {
+  var rep = reparaciones.find(function(r) { return r.id === idReparacion; });
+  if (!rep) return;
+  imprimirTicket(generarHTMLTicketEntrada(rep));
+}
+
+function imprimirTicketEntrega(idReparacion) {
+  var rep = reparaciones.find(function(r) { return r.id === idReparacion; });
+  if (!rep) return;
+  imprimirTicket(generarHTMLTicketEntrega(rep));
 }
 
 // ============================================================
