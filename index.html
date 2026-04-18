@@ -878,14 +878,83 @@
     </div>
     <div class="modal-body">
       <div class="form-grid">
-        <div class="form-group full" id="rep-cliente-selector">
+
+        <!-- CLIENTE -->
+        <div class="form-group full">
           <label class="form-label">Cliente *</label>
-          <select class="form-select" id="rep-cliente" onchange="actualizarRelojesSelect()"></select>
+          <div style="display:flex;gap:8px;align-items:center">
+            <select class="form-select" id="rep-cliente" onchange="actualizarRelojesSelect(null)" style="flex:1"></select>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="mostrarCreacionRapidaCliente()" title="Crear cliente nuevo">+ Nuevo</button>
+          </div>
         </div>
+
+        <!-- PANEL CREACIÓN RÁPIDA CLIENTE -->
+        <div class="form-group full" id="rep-nuevo-cliente-panel" style="display:none;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:14px">
+          <div style="font-size:13px;font-weight:500;color:var(--text2);margin-bottom:10px">Nuevo cliente (rápido)</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div class="form-group" style="grid-column:1/-1">
+              <label class="form-label">Nombre *</label>
+              <input type="text" class="form-input" id="rep-nc-nombre" placeholder="Nombre completo">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Teléfono</label>
+              <input type="tel" class="form-input" id="rep-nc-telefono" placeholder="600 000 000">
+            </div>
+            <div class="form-group">
+              <label class="form-label">DNI</label>
+              <input type="text" class="form-input" id="rep-nc-dni" placeholder="00000000A">
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:10px;justify-content:flex-end">
+            <button type="button" class="btn btn-secondary btn-sm" onclick="ocultarCreacionRapidaCliente()">Cancelar</button>
+            <button type="button" class="btn btn-primary btn-sm" onclick="guardarClienteRapido()">Crear cliente</button>
+          </div>
+        </div>
+
+        <!-- RELOJ -->
         <div class="form-group full">
           <label class="form-label">Reloj *</label>
-          <select class="form-select" id="rep-reloj"></select>
+          <div style="display:flex;gap:8px;align-items:center">
+            <select class="form-select" id="rep-reloj" style="flex:1"></select>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="mostrarCreacionRapidaReloj()" title="Crear reloj nuevo">+ Nuevo</button>
+          </div>
         </div>
+
+        <!-- PANEL CREACIÓN RÁPIDA RELOJ -->
+        <div class="form-group full" id="rep-nuevo-reloj-panel" style="display:none;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:14px">
+          <div style="font-size:13px;font-weight:500;color:var(--text2);margin-bottom:10px">Nuevo reloj (rápido)</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div class="form-group">
+              <label class="form-label">Marca</label>
+              <input type="text" class="form-input" id="rep-nr-marca" placeholder="Casio, Seiko...">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Modelo</label>
+              <input type="text" class="form-input" id="rep-nr-modelo" placeholder="Modelo">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Clase</label>
+              <select class="form-select" id="rep-nr-clase">
+                <option>Pulsera</option><option>Bolsillo</option><option>Sobremesa</option><option>Pared</option><option>Pie</option><option>Otro</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Movimiento</label>
+              <select class="form-select" id="rep-nr-movimiento">
+                <option>Cuarzo</option><option>Automático</option><option>Manual</option><option>Cuerda</option><option>Digital</option><option>Otro</option>
+              </select>
+            </div>
+            <div class="form-group" style="grid-column:1/-1">
+              <label class="form-label">Número de serie</label>
+              <input type="text" class="form-input" id="rep-nr-serie" placeholder="N/S (opcional)">
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:10px;justify-content:flex-end">
+            <button type="button" class="btn btn-secondary btn-sm" onclick="ocultarCreacionRapidaReloj()">Cancelar</button>
+            <button type="button" class="btn btn-primary btn-sm" onclick="guardarRelojRapido()">Crear reloj</button>
+          </div>
+        </div>
+
         <div class="form-group full">
           <label class="form-label">Descripción del problema *</label>
           <textarea class="form-textarea" id="rep-problema" placeholder="¿Qué le pasa al reloj?"></textarea>

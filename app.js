@@ -4,34 +4,34 @@
 const CLIENT_ID = '76160976051-deg4u3k5d09jif11pea0gk3qi2cmecpk.apps.googleusercontent.com';
 const SHEET_ID  = '1AjeEMxgWksJrcf3qweAQua9frORSzsW8p7s0x_bsEYU';
 const SCOPES    = 'https://www.googleapis.com/auth/spreadsheets';
-const API_KEY   = ''; // No necesaria con OAuth
 
-// Cabeceras de cada hoja
 const HEADERS = {
-  Clientes: ['Id_Cliente','Codigo_Cliente','Tipo_Cliente','Nombre_Completo','Nombre_Comercio','Telefono','DNI_CIF','Direccion','Email','Anotaciones','Fecha_Modificacion'],
-  Relojes:  ['Id_Reloj','Id_Cliente','Fecha_Alta','Clase','Movimiento','Marca','Modelo','Referencia','Num_Serie','Color_Caja','Material_Correa','Anyo_Aprox','Descripcion'],
+  Clientes:     ['Id_Cliente','Codigo_Cliente','Tipo_Cliente','Nombre_Completo','Nombre_Comercio','Telefono','DNI_CIF','Direccion','Email','Anotaciones','Fecha_Modificacion'],
+  Relojes:      ['Id_Reloj','Id_Cliente','Fecha_Alta','Clase','Movimiento','Marca','Modelo','Referencia','Num_Serie','Color_Caja','Material_Correa','Anyo_Aprox','Descripcion'],
   Reparaciones: ['Id_Reparacion','Id_Reloj','Fecha_Entrada','Descripcion_Problema','Estado_Visual','Observaciones_Internas','Precio_Presupuesto','Presupuesto_Aceptado','Estado','Fecha_Entrega_Estimada','Fecha_Entrega_Real','Recoge_Nombre','Recoge_DNI','Sin_Reparar','Motivo_Sin_Reparar','Firma_Base64'],
-  Pedidos:  ['Id_Pedido','Id_Cliente','Id_Reloj','Id_Reparacion','Descripcion_Pieza','Referencia_Marca','Proveedor','Precio','Estado','Fecha_Pedido','Fecha_Llegada_Estimada','Fecha_Llegada_Real','Notas'],
-  Consultas:['Id_Consulta','Id_Cliente','Id_Reloj','Id_Reparacion','Asunto','Descripcion','Respuesta','Estado','Fecha_Consulta']
+  Pedidos:      ['Id_Pedido','Id_Cliente','Id_Reloj','Id_Reparacion','Descripcion_Pieza','Referencia_Marca','Proveedor','Precio','Estado','Fecha_Pedido','Fecha_Llegada_Estimada','Fecha_Llegada_Real','Notas'],
+  Consultas:    ['Id_Consulta','Id_Cliente','Id_Reloj','Id_Reparacion','Asunto','Descripcion','Respuesta','Estado','Fecha_Consulta']
 };
 
 // ============================================================
-// ESTADO
+// ESTADO GLOBAL
 // ============================================================
 let tokenClient, accessToken;
-let clientes = [], relojes = [];
-let editandoClienteId = null, editandoRelojId = null;
-let clienteActivoId = null;
+let clientes = [], relojes = [], reparaciones = [];
+let editandoClienteId = null, editandoRelojId = null, editandoReparacionId = null;
+let clienteActivoId = null, relojActivoId = null, reparacionActivaId = null;
+let reparacionEntregaId = null;
+let firmaCtx = null, firmaDibujando = false;
+let _sheetIds = null;
 
 // ============================================================
-// GOOGLE IDENTITY / AUTH
+// GOOGLE AUTH
 // ============================================================
 function cargarGoogleScripts() {
   const s1 = document.createElement('script');
   s1.src = 'https://accounts.google.com/gsi/client';
   s1.onload = initAuth;
   document.head.appendChild(s1);
-
   const s2 = document.createElement('script');
   s2.src = 'https://apis.google.com/js/api.js';
   s2.onload = () => gapi.load('client', initGapiClient);
@@ -78,8 +78,8 @@ function mostrarApp() {
 // ============================================================
 async function apiGet(range) {
   const r = await fetch(
-    `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(range)}`,
-    { headers: { Authorization: `Bearer ${accessToken}` } }
+    'https://sheets.googleapis.com/v4/spreadsheets/' + SHEET_ID + '/values/' + encodeURIComponent(range),
+    { headers: { Authorization: 'Bearer ' + accessToken } }
   );
   const d = await r.json();
   return d.values || [];
@@ -87,46 +87,44 @@ async function apiGet(range) {
 
 async function apiAppend(sheet, values) {
   await fetch(
-    `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(sheet)}!A1:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,
-    {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ values: [values] })
-    }
+    'https://sheets.googleapis.com/v4/spreadsheets/' + SHEET_ID + '/values/' + encodeURIComponent(sheet) + '!A1:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS',
+    { method: 'POST', headers: { Authorization: 'Bearer ' + accessToken, 'Content-Type': 'application/json' }, body: JSON.stringify({ values: [values] }) }
   );
 }
 
 async function apiUpdate(range, values) {
   await fetch(
-    `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(range)}?valueInputOption=RAW`,
-    {
-      method: 'PUT',
-      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ values: [values] })
-    }
+    'https://sheets.googleapis.com/v4/spreadsheets/' + SHEET_ID + '/values/' + encodeURIComponent(range) + '?valueInputOption=RAW',
+    { method: 'PUT', headers: { Authorization: 'Bearer ' + accessToken, 'Content-Type': 'application/json' }, body: JSON.stringify({ values: [values] }) }
   );
 }
 
 async function apiBatchUpdate(requests) {
   await fetch(
-    `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}:batchUpdate`,
-    {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ requests })
-    }
+    'https://sheets.googleapis.com/v4/spreadsheets/' + SHEET_ID + ':batchUpdate',
+    { method: 'POST', headers: { Authorization: 'Bearer ' + accessToken, 'Content-Type': 'application/json' }, body: JSON.stringify({ requests: requests }) }
   );
 }
 
+async function getSheetIds() {
+  if (_sheetIds) return _sheetIds;
+  const r = await fetch(
+    'https://sheets.googleapis.com/v4/spreadsheets/' + SHEET_ID + '?fields=sheets.properties',
+    { headers: { Authorization: 'Bearer ' + accessToken } }
+  );
+  const d = await r.json();
+  _sheetIds = {};
+  for (const s of d.sheets) _sheetIds[s.properties.title] = s.properties.sheetId;
+  return _sheetIds;
+}
+
 // ============================================================
-// INICIALIZAR HOJAS (cabeceras si están vacías)
+// INICIALIZAR HOJAS
 // ============================================================
 async function inicializarHojas() {
-  for (const [hoja, cabeceras] of Object.entries(HEADERS)) {
-    const data = await apiGet(`${hoja}!A1:A1`);
-    if (!data.length) {
-      await apiUpdate(`${hoja}!A1`, cabeceras);
-    }
+  for (const hoja of Object.keys(HEADERS)) {
+    const data = await apiGet(hoja + '!A1:A1');
+    if (!data.length) await apiUpdate(hoja + '!A1', HEADERS[hoja]);
   }
 }
 
@@ -139,62 +137,81 @@ async function cargarTodo() {
 
 async function cargarClientes() {
   const rows = await apiGet('Clientes!A2:K');
-  clientes = rows.map(r => ({
+  clientes = rows.map(function(r) { return {
     id: r[0]||'', codigo: r[1]||'', tipo: r[2]||'Particular',
     nombre: r[3]||'', comercio: r[4]||'', telefono: r[5]||'',
     dni: r[6]||'', direccion: r[7]||'', email: r[8]||'',
     anotaciones: r[9]||'', fechaMod: r[10]||''
-  }));
+  }; });
   renderizarListaClientes(clientes);
 }
 
 async function cargarRelojes() {
-  const rows = await apiGet('Relojes!A2:N');
-  relojes = rows.map(r => ({
+  const rows = await apiGet('Relojes!A2:M');
+  relojes = rows.map(function(r) { return {
     id: r[0]||'', idCliente: r[1]||'', fechaAlta: r[2]||'',
     clase: r[3]||'', movimiento: r[4]||'', marca: r[5]||'',
     modelo: r[6]||'', referencia: r[7]||'', serie: r[8]||'',
     colorCaja: r[9]||'', materialCorrea: r[10]||'', anyoAprox: r[11]||'',
-    descripcion: r[12]||'', estadoVisual: r[13]||''
-  }));
+    descripcion: r[12]||''
+  }; });
   renderizarListaRelojosGlobal(relojes);
+}
+
+async function cargarReparaciones() {
+  const rows = await apiGet('Reparaciones!A2:P');
+  reparaciones = rows.map(function(r) { return {
+    id: r[0]||'', idReloj: r[1]||'', fechaEntrada: r[2]||'',
+    problema: r[3]||'', estadoVisual: r[4]||'', observaciones: r[5]||'',
+    precio: r[6]||'', presupuestoAceptado: r[7]||'', estado: r[8]||'',
+    fechaEstimada: r[9]||'', fechaEntregaReal: r[10]||'',
+    recogeNombre: r[11]||'', recogeDni: r[12]||'',
+    sinReparar: r[13]||'', motivoSinReparar: r[14]||'', firma: r[15]||''
+  }; });
+  renderizarListaReparaciones(reparaciones);
 }
 
 // ============================================================
 // UTILIDADES
 // ============================================================
-function uid() {
-  return Math.random().toString(36).substr(2,8);
-}
-
-function hoy() {
-  return new Date().toLocaleDateString('es-ES');
-}
+function uid() { return Math.random().toString(36).substr(2,8); }
+function hoy() { return new Date().toLocaleDateString('es-ES'); }
+function val(id) { var el = document.getElementById(id); return el ? el.value.trim() : ''; }
 
 function codigoCliente(tipo) {
-  const prefijos = { 'Particular': 'CLI-PART', 'Relojero/Tienda': 'CLI-REL' };
-  const pref = prefijos[tipo] || 'CLI';
-  const num = String(clientes.length + 1).padStart(5, '0');
-  return `${pref}-${num}`;
+  var pref = tipo === 'Relojero/Tienda' ? 'CLI-REL' : 'CLI-PART';
+  return pref + '-' + String(clientes.length + 1).padStart(5,'0');
 }
 
 function badgeTipo(tipo) {
-  const map = {
-    'Particular': 'badge-particular',
-    'Relojero/Tienda': 'badge-tienda'
-  };
-  return map[tipo] || 'badge-particular';
+  return tipo === 'Relojero/Tienda' ? 'badge-tienda' : 'badge-particular';
 }
 
-function val(id) { return document.getElementById(id)?.value?.trim() || ''; }
+function badgeEstado(estado) {
+  var map = {
+    'Pendiente de diagnóstico': 'badge-pendiente',
+    'Presupuesto enviado': 'badge-presupuesto',
+    'En reparación': 'badge-en-rep',
+    'Esperando pieza': 'badge-pieza',
+    'Lista para recoger': 'badge-lista',
+    'Entregada': 'badge-entregada'
+  };
+  return map[estado] || 'badge-pendiente';
+}
+
+function nombreReloj(r) {
+  if (!r) return '—';
+  return (r.marca || 'Sin marca') + (r.modelo ? ' · ' + r.modelo : '');
+}
 
 // ============================================================
 // NAVEGACIÓN
 // ============================================================
 function showPanel(nombre) {
-  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
-  document.getElementById(`panel-${nombre}`)?.classList.add('active');
+  document.querySelectorAll('.panel').forEach(function(p) { p.classList.remove('active'); });
+  document.querySelectorAll('.nav-tab').forEach(function(t) { t.classList.remove('active'); });
+  var panel = document.getElementById('panel-' + nombre);
+  if (panel) panel.classList.add('active');
   event.target.classList.add('active');
 }
 
@@ -202,36 +219,31 @@ function showPanel(nombre) {
 // CLIENTES — LISTA
 // ============================================================
 function renderizarListaClientes(lista) {
-  const el = document.getElementById('lista-clientes');
+  var el = document.getElementById('lista-clientes');
   if (!lista.length) {
-    el.innerHTML = `<div class="empty-state"><div class="empty-state-icon">👤</div><div class="empty-state-text">No hay clientes. ¡Añade el primero!</div></div>`;
+    el.innerHTML = '<div class="empty-state"><div class="empty-state-icon">👤</div><div class="empty-state-text">No hay clientes. ¡Añade el primero!</div></div>';
     return;
   }
-  el.innerHTML = lista.map(c => `
-    <div class="list-item" onclick="verCliente('${c.id}')">
-      <div class="list-item-main">
-        <div class="list-item-name">${c.nombre}${c.comercio ? ` <span style="color:var(--text3);font-weight:400">· ${c.comercio}</span>` : ''}</div>
-        <div class="list-item-sub">${c.telefono || '—'} · ${c.dni || '—'} · ${c.codigo}</div>
-      </div>
-      <div class="list-item-actions">
-        <span class="badge ${badgeTipo(c.tipo)}">${c.tipo}</span>
-        <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();abrirModalCliente('${c.id}')">Editar</button>
-        <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();confirmarEliminarCliente('${c.id}','${c.nombre}')">✕</button>
-      </div>
-    </div>
-  `).join('');
+  el.innerHTML = lista.map(function(c) {
+    return '<div class="list-item" onclick="verCliente(\'' + c.id + '\')">' +
+      '<div class="list-item-main">' +
+        '<div class="list-item-name">' + c.nombre + (c.comercio ? ' <span style="color:var(--text3);font-weight:400">· ' + c.comercio + '</span>' : '') + '</div>' +
+        '<div class="list-item-sub">' + (c.telefono||'—') + ' · ' + (c.dni||'—') + ' · ' + c.codigo + '</div>' +
+      '</div>' +
+      '<div class="list-item-actions">' +
+        '<span class="badge ' + badgeTipo(c.tipo) + '">' + c.tipo + '</span>' +
+        '<button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();abrirModalCliente(\'' + c.id + '\')">Editar</button>' +
+        '<button class="btn btn-danger btn-sm" onclick="event.stopPropagation();confirmarEliminarCliente(\'' + c.id + '\',\'' + c.nombre.replace(/'/g,"\\'") + '\')">✕</button>' +
+      '</div></div>';
+  }).join('');
 }
 
 function filtrarClientes() {
-  const q = document.getElementById('search-clientes').value.toLowerCase();
-  const filtrados = clientes.filter(c =>
-    c.nombre.toLowerCase().includes(q) ||
-    c.telefono.includes(q) ||
-    c.dni.toLowerCase().includes(q) ||
-    c.comercio.toLowerCase().includes(q) ||
-    c.email.toLowerCase().includes(q)
-  );
-  renderizarListaClientes(filtrados);
+  var q = document.getElementById('search-clientes').value.toLowerCase();
+  renderizarListaClientes(clientes.filter(function(c) {
+    return c.nombre.toLowerCase().includes(q) || c.telefono.includes(q) ||
+      c.dni.toLowerCase().includes(q) || c.comercio.toLowerCase().includes(q) || c.email.toLowerCase().includes(q);
+  }));
 }
 
 // ============================================================
@@ -239,156 +251,187 @@ function filtrarClientes() {
 // ============================================================
 function verCliente(id) {
   clienteActivoId = id;
-  const c = clientes.find(x => x.id === id);
+  relojActivoId = null;
+  var c = clientes.find(function(x) { return x.id === id; });
   if (!c) return;
-  const relojesCliente = relojes.filter(r => r.idCliente === id);
+  var relojesCliente = relojes.filter(function(r) { return r.idCliente === id; });
 
-  const listView = document.getElementById('clientes-list-view');
-  const detailView = document.getElementById('clientes-detail-view');
+  document.getElementById('clientes-list-view').style.display = 'none';
+  document.getElementById('clientes-detail-view').style.display = 'block';
 
-  listView.style.display = 'none';
-  detailView.style.display = 'block';
+  var relojesHTML = relojesCliente.length === 0
+    ? '<div class="empty-state" style="padding:24px"><div class="empty-state-text">Este cliente no tiene relojes registrados.</div></div>'
+    : relojesCliente.map(function(r) { return htmlRelojCard(r, id); }).join('');
 
-  detailView.innerHTML = `
-    <div class="breadcrumb">
-      <span class="breadcrumb-link" onclick="volverAClientes()">Clientes</span>
-      <span class="breadcrumb-sep">›</span>
-      <span>${c.nombre}</span>
-    </div>
+  document.getElementById('clientes-detail-view').innerHTML =
+    '<div class="breadcrumb">' +
+      '<span class="breadcrumb-link" onclick="volverAClientes()">Clientes</span>' +
+      '<span class="breadcrumb-sep">›</span>' +
+      '<span>' + c.nombre + '</span>' +
+    '</div>' +
+    '<div class="detail-card">' +
+      '<div class="detail-header">' +
+        '<div>' +
+          '<div class="detail-header-title">' + c.nombre + '</div>' +
+          '<div class="detail-header-sub">' + c.codigo + ' · ' + c.tipo + '</div>' +
+        '</div>' +
+        '<div class="detail-header-actions">' +
+          '<button class="btn-header" onclick="abrirModalCliente(\'' + c.id + '\')">✎ Editar</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="detail-body">' +
+        '<div class="detail-grid">' +
+          '<div class="detail-field"><div class="detail-field-label">Teléfono</div><div class="detail-field-value mono">' + (c.telefono||'—') + '</div></div>' +
+          '<div class="detail-field"><div class="detail-field-label">DNI / CIF</div><div class="detail-field-value mono">' + (c.dni||'—') + '</div></div>' +
+          '<div class="detail-field"><div class="detail-field-label">Email</div><div class="detail-field-value">' + (c.email||'—') + '</div></div>' +
+          '<div class="detail-field"><div class="detail-field-label">Comercio</div><div class="detail-field-value">' + (c.comercio||'—') + '</div></div>' +
+          '<div class="detail-field" style="grid-column:1/-1"><div class="detail-field-label">Dirección</div><div class="detail-field-value">' + (c.direccion||'—') + '</div></div>' +
+          (c.anotaciones ? '<div class="detail-field" style="grid-column:1/-1"><div class="detail-field-label">Anotaciones</div><div class="detail-field-value">' + c.anotaciones + '</div></div>' : '') +
+        '</div>' +
+        '<div class="subsection-title">Relojes <small style="font-size:14px;font-weight:400;color:var(--text3)">(' + relojesCliente.length + ')</small>' +
+          '<button class="btn btn-primary btn-sm" onclick="abrirModalReloj(\'' + id + '\')">+ Añadir reloj</button>' +
+        '</div>' +
+        '<div id="relojes-cliente-' + id + '">' + relojesHTML + '</div>' +
+      '</div>' +
+    '</div>';
+}
 
-    <div class="detail-card">
-      <div class="detail-header">
-        <div>
-          <div class="detail-header-title">${c.nombre}</div>
-          <div class="detail-header-sub">${c.codigo} · ${c.tipo}</div>
-        </div>
-        <div class="detail-header-actions">
-          <button class="btn-header" onclick="abrirModalCliente('${c.id}')">✎ Editar</button>
-        </div>
-      </div>
-      <div class="detail-body">
-        <div class="detail-grid">
-          <div class="detail-field">
-            <div class="detail-field-label">Teléfono</div>
-            <div class="detail-field-value mono">${c.telefono || '<span class="empty">—</span>'}</div>
-          </div>
-          <div class="detail-field">
-            <div class="detail-field-label">DNI / CIF</div>
-            <div class="detail-field-value mono">${c.dni || '<span class="empty">—</span>'}</div>
-          </div>
-          <div class="detail-field">
-            <div class="detail-field-label">Email</div>
-            <div class="detail-field-value">${c.email || '<span class="empty">—</span>'}</div>
-          </div>
-          <div class="detail-field">
-            <div class="detail-field-label">Comercio</div>
-            <div class="detail-field-value">${c.comercio || '<span class="empty">—</span>'}</div>
-          </div>
-          <div class="detail-field" style="grid-column:1/-1">
-            <div class="detail-field-label">Dirección</div>
-            <div class="detail-field-value">${c.direccion || '<span class="empty">—</span>'}</div>
-          </div>
-          ${c.anotaciones ? `
-          <div class="detail-field" style="grid-column:1/-1">
-            <div class="detail-field-label">Anotaciones</div>
-            <div class="detail-field-value">${c.anotaciones}</div>
-          </div>` : ''}
-        </div>
-
-        <div class="subsection-title">
-          Relojes <small style="font-size:14px;font-weight:400;color:var(--text3)">(${relojesCliente.length})</small>
-          <button class="btn btn-primary btn-sm" onclick="abrirModalReloj('${c.id}')">+ Añadir reloj</button>
-        </div>
-
-        <div id="relojes-cliente-${id}">
-          ${relojesCliente.length === 0
-            ? `<div class="empty-state" style="padding:24px"><div class="empty-state-text">Este cliente no tiene relojes registrados.</div></div>`
-            : relojesCliente.map(r => `
-              <div class="reloj-card" onclick="verReloj('${r.id}')">
-                <div class="reloj-card-main">
-                  <div class="reloj-card-marca">${r.marca || 'Sin marca'} ${r.modelo ? '· ' + r.modelo : ''}</div>
-                  <div class="reloj-card-modelo">${r.movimiento} · ${r.clase}</div>
-                  ${r.serie ? `<div class="reloj-card-ref">N/S: ${r.serie}</div>` : ''}
-                  ${r.referencia ? `<div class="reloj-card-ref">Ref: ${r.referencia}</div>` : ''}
-                </div>
-                <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px">
-                  <span class="reloj-clase-badge">${r.clase}</span>
-                  <div style="display:flex;gap:6px">
-                    <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();abrirModalReloj('${c.id}','${r.id}')">Editar</button>
-                    <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();confirmarEliminarReloj('${r.id}','${r.marca}')">✕</button>
-                  </div>
-                </div>
-              </div>
-            `).join('')
-          }
-        </div>
-      </div>
-    </div>
-  `;
+function htmlRelojCard(r, idCliente) {
+  var activa = reparaciones.find(function(x) { return x.idReloj === r.id && x.estado !== 'Entregada'; });
+  return '<div class="reloj-card" onclick="verReloj(\'' + r.id + '\')">' +
+    '<div class="reloj-card-main">' +
+      '<div class="reloj-card-marca">' + (r.marca||'Sin marca') + (r.modelo ? ' · ' + r.modelo : '') + '</div>' +
+      '<div class="reloj-card-modelo">' + r.movimiento + ' · ' + r.clase + '</div>' +
+      (r.serie ? '<div class="reloj-card-ref">N/S: ' + r.serie + '</div>' : '') +
+      (r.referencia ? '<div class="reloj-card-ref">Ref: ' + r.referencia + '</div>' : '') +
+      (activa ? '<div style="margin-top:6px"><span class="badge ' + badgeEstado(activa.estado) + '">' + activa.estado + '</span></div>' : '') +
+    '</div>' +
+    '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px">' +
+      '<span class="reloj-clase-badge">' + r.clase + '</span>' +
+      '<div style="display:flex;gap:6px">' +
+        '<button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();abrirModalReloj(\'' + idCliente + '\',\'' + r.id + '\')">Editar</button>' +
+        '<button class="btn btn-danger btn-sm" onclick="event.stopPropagation();confirmarEliminarReloj(\'' + r.id + '\',\'' + (r.marca||'').replace(/'/g,"\\'") + '\')">✕</button>' +
+      '</div>' +
+    '</div>' +
+  '</div>';
 }
 
 function volverAClientes() {
   clienteActivoId = null;
+  relojActivoId = null;
   document.getElementById('clientes-list-view').style.display = 'block';
   document.getElementById('clientes-detail-view').style.display = 'none';
 }
 
+// ============================================================
+// RELOJES — DETALLE
+// ============================================================
 function verReloj(id) {
-  // Próximamente: detalle de reloj con sus reparaciones
-  toast('Detalle de reloj — próximamente', '');
+  relojActivoId = id;
+  var r = relojes.find(function(x) { return x.id === id; });
+  if (!r) return;
+  var c = clientes.find(function(x) { return x.id === r.idCliente; });
+  var repsReloj = reparaciones.filter(function(x) { return x.idReloj === id; });
+
+  document.getElementById('clientes-list-view').style.display = 'none';
+  var dv = document.getElementById('clientes-detail-view');
+  dv.style.display = 'block';
+
+  var repsHTML = repsReloj.length === 0
+    ? '<div class="empty-state" style="padding:24px"><div class="empty-state-text">Este reloj no tiene reparaciones registradas.</div></div>'
+    : repsReloj.map(function(rep) {
+        return '<div class="rep-card" onclick="verReparacion(\'' + rep.id + '\')">' +
+          '<div class="rep-card-header">' +
+            '<div>' +
+              '<div class="rep-card-title">' + (rep.problema||'Sin descripción').substring(0,70) + (rep.problema&&rep.problema.length>70?'...':'') + '</div>' +
+              '<div class="rep-card-sub">Entrada: ' + rep.fechaEntrada + (rep.fechaEstimada?' · Estimada: '+rep.fechaEstimada:'') + '</div>' +
+            '</div>' +
+            '<div class="rep-card-actions">' +
+              '<span class="badge ' + badgeEstado(rep.estado) + '">' + rep.estado + '</span>' +
+              (rep.estado==='Lista para recoger' ? '<button class="btn btn-primary btn-sm" onclick="event.stopPropagation();abrirModalEntrega(\'' + rep.id + '\')">Entregar</button>' : '') +
+              '<button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();abrirModalReparacion(null,\'' + rep.id + '\')">Editar</button>' +
+            '</div>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+
+  dv.innerHTML =
+    '<div class="breadcrumb">' +
+      '<span class="breadcrumb-link" onclick="volverAClientes()">Clientes</span>' +
+      '<span class="breadcrumb-sep">›</span>' +
+      (c ? '<span class="breadcrumb-link" onclick="verCliente(\'' + c.id + '\')">' + c.nombre + '</span><span class="breadcrumb-sep">›</span>' : '') +
+      '<span>' + nombreReloj(r) + '</span>' +
+    '</div>' +
+    '<div class="detail-card">' +
+      '<div class="detail-header">' +
+        '<div>' +
+          '<div class="detail-header-title">' + nombreReloj(r) + '</div>' +
+          '<div class="detail-header-sub">' + r.clase + ' · ' + r.movimiento + (c?' · '+c.nombre:'') + '</div>' +
+        '</div>' +
+        '<div class="detail-header-actions">' +
+          '<button class="btn-header" onclick="abrirModalReparacion(\'' + r.id + '\',null)">+ Reparación</button>' +
+          '<button class="btn-header" onclick="abrirModalReloj(\'' + r.idCliente + '\',\'' + r.id + '\')">✎ Editar</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="detail-body">' +
+        '<div class="detail-grid">' +
+          '<div class="detail-field"><div class="detail-field-label">Marca</div><div class="detail-field-value">' + (r.marca||'—') + '</div></div>' +
+          '<div class="detail-field"><div class="detail-field-label">Modelo</div><div class="detail-field-value">' + (r.modelo||'—') + '</div></div>' +
+          '<div class="detail-field"><div class="detail-field-label">Referencia</div><div class="detail-field-value mono">' + (r.referencia||'—') + '</div></div>' +
+          '<div class="detail-field"><div class="detail-field-label">Número de serie</div><div class="detail-field-value mono">' + (r.serie||'—') + '</div></div>' +
+          '<div class="detail-field"><div class="detail-field-label">Movimiento</div><div class="detail-field-value">' + (r.movimiento||'—') + '</div></div>' +
+          '<div class="detail-field"><div class="detail-field-label">Clase</div><div class="detail-field-value">' + (r.clase||'—') + '</div></div>' +
+          '<div class="detail-field"><div class="detail-field-label">Color de caja</div><div class="detail-field-value">' + (r.colorCaja||'—') + '</div></div>' +
+          '<div class="detail-field"><div class="detail-field-label">Material correa</div><div class="detail-field-value">' + (r.materialCorrea||'—') + '</div></div>' +
+          '<div class="detail-field"><div class="detail-field-label">Año aprox.</div><div class="detail-field-value">' + (r.anyoAprox||'—') + '</div></div>' +
+          '<div class="detail-field"><div class="detail-field-label">Fecha de alta</div><div class="detail-field-value mono">' + (r.fechaAlta||'—') + '</div></div>' +
+          (r.descripcion ? '<div class="detail-field" style="grid-column:1/-1"><div class="detail-field-label">Descripción</div><div class="detail-field-value">' + r.descripcion + '</div></div>' : '') +
+        '</div>' +
+        '<div class="subsection-title">Reparaciones <small style="font-size:14px;font-weight:400;color:var(--text3)">(' + repsReloj.length + ')</small>' +
+          '<button class="btn btn-primary btn-sm" onclick="abrirModalReparacion(\'' + r.id + '\',null)">+ Nueva reparación</button>' +
+        '</div>' +
+        repsHTML +
+      '</div>' +
+    '</div>';
 }
 
 // ============================================================
 // CLIENTES — MODAL
 // ============================================================
-function abrirModalCliente(id = null) {
+function abrirModalCliente(id) {
+  id = id || null;
   editandoClienteId = id;
-  const c = id ? clientes.find(x => x.id === id) : null;
+  var c = id ? clientes.find(function(x) { return x.id === id; }) : null;
   document.getElementById('modal-cliente-title').textContent = c ? 'Editar cliente' : 'Nuevo cliente';
-
-  document.getElementById('c-tipo').value        = c?.tipo || 'Particular';
-  document.getElementById('c-nombre').value      = c?.nombre || '';
-  document.getElementById('c-comercio').value    = c?.comercio || '';
-  document.getElementById('c-telefono').value    = c?.telefono || '';
-  document.getElementById('c-dni').value         = c?.dni || '';
-  document.getElementById('c-email').value       = c?.email || '';
-  document.getElementById('c-direccion').value   = c?.direccion || '';
-  document.getElementById('c-anotaciones').value = c?.anotaciones || '';
-
+  document.getElementById('c-tipo').value        = c ? c.tipo : 'Particular';
+  document.getElementById('c-nombre').value      = c ? c.nombre : '';
+  document.getElementById('c-comercio').value    = c ? c.comercio : '';
+  document.getElementById('c-telefono').value    = c ? c.telefono : '';
+  document.getElementById('c-dni').value         = c ? c.dni : '';
+  document.getElementById('c-email').value       = c ? c.email : '';
+  document.getElementById('c-direccion').value   = c ? c.direccion : '';
+  document.getElementById('c-anotaciones').value = c ? c.anotaciones : '';
   abrirModal('modal-cliente');
 }
 
 async function guardarCliente() {
-  const nombre = val('c-nombre');
+  var nombre = val('c-nombre');
   if (!nombre) { toast('El nombre es obligatorio', 'error'); return; }
-
-  const tipo      = val('c-tipo');
-  const comercio  = val('c-comercio');
-  const telefono  = val('c-telefono');
-  const dni       = val('c-dni');
-  const email     = val('c-email');
-  const direccion = val('c-direccion');
-  const anots     = val('c-anotaciones');
-  const fecha     = hoy();
-
+  var tipo = val('c-tipo'), comercio = val('c-comercio'), telefono = val('c-telefono');
+  var dni = val('c-dni'), email = val('c-email'), direccion = val('c-direccion');
+  var anots = val('c-anotaciones'), fecha = hoy();
   if (editandoClienteId) {
-    // Buscar fila
-    const idx = clientes.findIndex(c => c.id === editandoClienteId);
-    const codigo = clientes[idx].codigo;
-    const row = idx + 2;
-    await apiUpdate(`Clientes!A${row}:K${row}`, [
-      editandoClienteId, codigo, tipo, nombre, comercio, telefono, dni, direccion, email, anots, fecha
-    ]);
-    clientes[idx] = { id: editandoClienteId, codigo, tipo, nombre, comercio, telefono, dni, direccion, email, anotaciones: anots, fechaMod: fecha };
+    var idx = clientes.findIndex(function(c) { return c.id === editandoClienteId; });
+    var codigo = clientes[idx].codigo;
+    await apiUpdate('Clientes!A' + (idx+2) + ':K' + (idx+2), [editandoClienteId, codigo, tipo, nombre, comercio, telefono, dni, direccion, email, anots, fecha]);
+    clientes[idx] = { id: editandoClienteId, codigo: codigo, tipo: tipo, nombre: nombre, comercio: comercio, telefono: telefono, dni: dni, direccion: direccion, email: email, anotaciones: anots, fechaMod: fecha };
     toast('Cliente actualizado', 'success');
   } else {
-    const id = uid();
-    const codigo = codigoCliente(tipo);
-    await apiAppend('Clientes', [id, codigo, tipo, nombre, comercio, telefono, dni, direccion, email, anots, fecha]);
-    clientes.push({ id, codigo, tipo, nombre, comercio, telefono, dni, direccion, email, anotaciones: anots, fechaMod: fecha });
+    var id = uid(), codigoN = codigoCliente(tipo);
+    await apiAppend('Clientes', [id, codigoN, tipo, nombre, comercio, telefono, dni, direccion, email, anots, fecha]);
+    clientes.push({ id: id, codigo: codigoN, tipo: tipo, nombre: nombre, comercio: comercio, telefono: telefono, dni: dni, direccion: direccion, email: email, anotaciones: anots, fechaMod: fecha });
     toast('Cliente creado', 'success');
   }
-
   cerrarModal('modal-cliente');
   renderizarListaClientes(clientes);
   if (editandoClienteId && clienteActivoId === editandoClienteId) verCliente(editandoClienteId);
@@ -398,303 +441,126 @@ async function guardarCliente() {
 // RELOJES — LISTA GLOBAL
 // ============================================================
 function renderizarListaRelojosGlobal(lista) {
-  const el = document.getElementById('lista-relojes-global');
+  var el = document.getElementById('lista-relojes-global');
   if (!lista.length) {
-    el.innerHTML = `<div class="empty-state"><div class="empty-state-icon">⌚</div><div class="empty-state-text">No hay relojes registrados.</div></div>`;
+    el.innerHTML = '<div class="empty-state"><div class="empty-state-icon">⌚</div><div class="empty-state-text">No hay relojes registrados.</div></div>';
     return;
   }
-  el.innerHTML = lista.map(r => {
-    const c = clientes.find(x => x.id === r.idCliente);
-    return `
-    <div class="list-item">
-      <div class="list-item-main">
-        <div class="list-item-name">${r.marca || 'Sin marca'} ${r.modelo ? '· ' + r.modelo : ''}</div>
-        <div class="list-item-sub">${r.clase} · ${r.movimiento}${r.serie ? ' · N/S: '+r.serie : ''}${c ? ' — '+c.nombre : ''}</div>
-      </div>
-      <div class="list-item-actions">
-        <button class="btn btn-secondary btn-sm" onclick="abrirModalReloj('${r.idCliente}','${r.id}')">Editar</button>
-        <button class="btn btn-danger btn-sm" onclick="confirmarEliminarReloj('${r.id}','${r.marca}')">✕</button>
-      </div>
-    </div>`;
+  el.innerHTML = lista.map(function(r) {
+    var c = clientes.find(function(x) { return x.id === r.idCliente; });
+    return '<div class="list-item" onclick="verReloj(\'' + r.id + '\')">' +
+      '<div class="list-item-main">' +
+        '<div class="list-item-name">' + nombreReloj(r) + '</div>' +
+        '<div class="list-item-sub">' + r.clase + ' · ' + r.movimiento + (r.serie?' · N/S: '+r.serie:'') + (c?' — '+c.nombre:'') + '</div>' +
+      '</div>' +
+      '<div class="list-item-actions">' +
+        '<button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();abrirModalReloj(\'' + r.idCliente + '\',\'' + r.id + '\')">Editar</button>' +
+        '<button class="btn btn-danger btn-sm" onclick="event.stopPropagation();confirmarEliminarReloj(\'' + r.id + '\',\'' + (r.marca||'').replace(/'/g,"\\'") + '\')">✕</button>' +
+      '</div></div>';
   }).join('');
 }
 
 function filtrarRelojes() {
-  const q = document.getElementById('search-relojes').value.toLowerCase();
-  const filtrados = relojes.filter(r =>
-    r.marca.toLowerCase().includes(q) ||
-    r.modelo.toLowerCase().includes(q) ||
-    r.referencia.toLowerCase().includes(q) ||
-    r.serie.toLowerCase().includes(q)
-  );
-  renderizarListaRelojosGlobal(filtrados);
+  var q = document.getElementById('search-relojes').value.toLowerCase();
+  renderizarListaRelojosGlobal(relojes.filter(function(r) {
+    return r.marca.toLowerCase().includes(q) || r.modelo.toLowerCase().includes(q) ||
+      r.referencia.toLowerCase().includes(q) || r.serie.toLowerCase().includes(q);
+  }));
 }
 
 // ============================================================
 // RELOJES — MODAL
 // ============================================================
-function abrirModalReloj(idCliente = null, idReloj = null) {
+function abrirModalReloj(idCliente, idReloj) {
+  idCliente = idCliente || null;
+  idReloj = idReloj || null;
   editandoRelojId = idReloj;
-  const r = idReloj ? relojes.find(x => x.id === idReloj) : null;
+  var r = idReloj ? relojes.find(function(x) { return x.id === idReloj; }) : null;
   document.getElementById('modal-reloj-title').textContent = r ? 'Editar reloj' : 'Nuevo reloj';
-
-  // Selector de cliente (solo si no viene de un cliente concreto)
-  const selectorCliente = document.getElementById('reloj-cliente-selector');
-  const selectCliente   = document.getElementById('r-cliente');
-
+  var selectorCliente = document.getElementById('reloj-cliente-selector');
+  var selectCliente = document.getElementById('r-cliente');
   if (!idCliente) {
     selectorCliente.style.display = 'block';
-    selectCliente.innerHTML = clientes.map(c =>
-      `<option value="${c.id}" ${r?.idCliente === c.id ? 'selected' : ''}>${c.nombre}</option>`
-    ).join('');
+    selectCliente.innerHTML = clientes.map(function(c) { return '<option value="' + c.id + '" ' + (r&&r.idCliente===c.id?'selected':'') + '>' + c.nombre + '</option>'; }).join('');
   } else {
     selectorCliente.style.display = 'none';
     selectCliente.dataset.fijo = idCliente;
   }
-
-  document.getElementById('r-clase').value       = r?.clase || 'Pulsera';
-  document.getElementById('r-movimiento').value  = r?.movimiento || 'Cuarzo';
-  document.getElementById('r-marca').value       = r?.marca || '';
-  document.getElementById('r-modelo').value      = r?.modelo || '';
-  document.getElementById('r-referencia').value  = r?.referencia || '';
-  document.getElementById('r-serie').value       = r?.serie || '';
-  document.getElementById('r-color').value       = r?.colorCaja || '';
-  document.getElementById('r-correa').value      = r?.materialCorrea || '';
-  document.getElementById('r-anyo').value        = r?.anyoAprox || '';
-  document.getElementById('r-descripcion').value = r?.descripcion || '';
-
+  document.getElementById('r-clase').value       = r ? r.clase : 'Pulsera';
+  document.getElementById('r-movimiento').value  = r ? r.movimiento : 'Cuarzo';
+  document.getElementById('r-marca').value       = r ? r.marca : '';
+  document.getElementById('r-modelo').value      = r ? r.modelo : '';
+  document.getElementById('r-referencia').value  = r ? r.referencia : '';
+  document.getElementById('r-serie').value       = r ? r.serie : '';
+  document.getElementById('r-color').value       = r ? r.colorCaja : '';
+  document.getElementById('r-correa').value      = r ? r.materialCorrea : '';
+  document.getElementById('r-anyo').value        = r ? r.anyoAprox : '';
+  document.getElementById('r-descripcion').value = r ? r.descripcion : '';
   abrirModal('modal-reloj');
 }
 
 async function guardarReloj() {
-  const selectorCliente = document.getElementById('reloj-cliente-selector');
-  const selectCliente   = document.getElementById('r-cliente');
-  const idCliente = selectorCliente.style.display === 'none'
-    ? selectCliente.dataset.fijo
-    : selectCliente.value;
-
+  var selectorCliente = document.getElementById('reloj-cliente-selector');
+  var selectCliente = document.getElementById('r-cliente');
+  var idCliente = selectorCliente.style.display === 'none' ? selectCliente.dataset.fijo : selectCliente.value;
   if (!idCliente) { toast('Selecciona un cliente', 'error'); return; }
-
-  const clase      = val('r-clase');
-  const movimiento = val('r-movimiento');
-  const marca      = val('r-marca');
-  const modelo     = val('r-modelo');
-  const referencia = val('r-referencia');
-  const serie      = val('r-serie');
-  const colorCaja  = val('r-color');
-  const correa     = val('r-correa');
-  const anyo       = val('r-anyo');
-  const desc       = val('r-descripcion');
-  const estadoVis  = val('r-estado-visual');
-  const fecha      = hoy();
-
+  var clase = val('r-clase'), movimiento = val('r-movimiento'), marca = val('r-marca');
+  var modelo = val('r-modelo'), referencia = val('r-referencia'), serie = val('r-serie');
+  var colorCaja = val('r-color'), correa = val('r-correa'), anyo = val('r-anyo');
+  var desc = val('r-descripcion'), fecha = hoy();
   if (editandoRelojId) {
-    const idx = relojes.findIndex(r => r.id === editandoRelojId);
-    const row = idx + 2;
-    await apiUpdate(`Relojes!A${row}:M${row}`, [
-      editandoRelojId, idCliente, fecha, clase, movimiento, marca, modelo, referencia, serie, colorCaja, correa, anyo, desc
-    ]);
-    relojes[idx] = { id: editandoRelojId, idCliente, fechaAlta: fecha, clase, movimiento, marca, modelo, referencia, serie, colorCaja, materialCorrea: correa, anyoAprox: anyo, descripcion: desc };
+    var idx = relojes.findIndex(function(r) { return r.id === editandoRelojId; });
+    await apiUpdate('Relojes!A' + (idx+2) + ':M' + (idx+2), [editandoRelojId, idCliente, fecha, clase, movimiento, marca, modelo, referencia, serie, colorCaja, correa, anyo, desc]);
+    relojes[idx] = { id: editandoRelojId, idCliente: idCliente, fechaAlta: fecha, clase: clase, movimiento: movimiento, marca: marca, modelo: modelo, referencia: referencia, serie: serie, colorCaja: colorCaja, materialCorrea: correa, anyoAprox: anyo, descripcion: desc };
     toast('Reloj actualizado', 'success');
   } else {
-    const id = uid();
+    var id = uid();
     await apiAppend('Relojes', [id, idCliente, fecha, clase, movimiento, marca, modelo, referencia, serie, colorCaja, correa, anyo, desc]);
-    relojes.push({ id, idCliente, fechaAlta: fecha, clase, movimiento, marca, modelo, referencia, serie, colorCaja, materialCorrea: correa, anyoAprox: anyo, descripcion: desc });
+    relojes.push({ id: id, idCliente: idCliente, fechaAlta: fecha, clase: clase, movimiento: movimiento, marca: marca, modelo: modelo, referencia: referencia, serie: serie, colorCaja: colorCaja, materialCorrea: correa, anyoAprox: anyo, descripcion: desc });
     toast('Reloj añadido', 'success');
   }
-
   cerrarModal('modal-reloj');
   renderizarListaRelojosGlobal(relojes);
   if (clienteActivoId) verCliente(clienteActivoId);
-}
-
-// ============================================================
-// ELIMINAR
-// ============================================================
-function confirmarEliminarCliente(id, nombre) {
-  mostrarConfirm(
-    '¿Eliminar cliente?',
-    `Se eliminará a "${nombre}" y todos sus relojes asociados. Esta acción no se puede deshacer.`,
-    async () => {
-      await eliminarFilaPorId('Clientes', id, clientes);
-      clientes = clientes.filter(c => c.id !== id);
-      // Eliminar también sus relojes
-      const suyos = relojes.filter(r => r.idCliente === id);
-      for (const r of suyos) await eliminarFilaPorId('Relojes', r.id, relojes);
-      relojes = relojes.filter(r => r.idCliente !== id);
-      renderizarListaClientes(clientes);
-      renderizarListaRelojosGlobal(relojes);
-      if (clienteActivoId === id) volverAClientes();
-      toast('Cliente eliminado', 'success');
-    }
-  );
-}
-
-function confirmarEliminarReloj(id, marca) {
-  mostrarConfirm(
-    '¿Eliminar reloj?',
-    `Se eliminará el reloj "${marca || 'sin marca'}". Esta acción no se puede deshacer.`,
-    async () => {
-      await eliminarFilaPorId('Relojes', id, relojes);
-      relojes = relojes.filter(r => r.id !== id);
-      renderizarListaRelojosGlobal(relojes);
-      if (clienteActivoId) verCliente(clienteActivoId);
-      toast('Reloj eliminado', 'success');
-    }
-  );
-}
-
-async function eliminarFilaPorId(hoja, id, lista) {
-  // Obtener todas las filas para encontrar el número
-  const rows = await apiGet(`${hoja}!A2:A`);
-  const rowIdx = rows.findIndex(r => r[0] === id);
-  if (rowIdx === -1) return;
-  const sheetRow = rowIdx + 2; // +1 por cabecera, +1 por base 1
-
-  // Necesitamos el sheetId de la hoja
-  const sheetIdMap = await getSheetIds();
-  const sheetId = sheetIdMap[hoja];
-  if (sheetId === undefined) return;
-
-  await apiBatchUpdate([{
-    deleteDimension: {
-      range: { sheetId, dimension: 'ROWS', startIndex: sheetRow - 1, endIndex: sheetRow }
-    }
-  }]);
-}
-
-let _sheetIds = null;
-async function getSheetIds() {
-  if (_sheetIds) return _sheetIds;
-  const r = await fetch(
-    `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}?fields=sheets.properties`,
-    { headers: { Authorization: `Bearer ${accessToken}` } }
-  );
-  const d = await r.json();
-  _sheetIds = {};
-  for (const s of d.sheets) _sheetIds[s.properties.title] = s.properties.sheetId;
-  return _sheetIds;
-}
-
-// ============================================================
-// UI HELPERS
-// ============================================================
-function abrirModal(id) {
-  document.getElementById(id).classList.add('open');
-}
-
-function cerrarModal(id) {
-  document.getElementById(id).classList.remove('open');
-}
-
-let confirmCallback = null;
-function mostrarConfirm(title, text, cb) {
-  document.getElementById('confirm-title').textContent = title;
-  document.getElementById('confirm-text').textContent = text;
-  confirmCallback = cb;
-  document.getElementById('confirm-overlay').classList.add('open');
-  document.getElementById('confirm-ok').onclick = async () => {
-    cerrarConfirm();
-    await cb();
-  };
-}
-function cerrarConfirm() {
-  document.getElementById('confirm-overlay').classList.remove('open');
-}
-
-function toast(msg, tipo = '') {
-  const el = document.createElement('div');
-  el.className = `toast ${tipo}`;
-  el.textContent = msg;
-  document.getElementById('toast-container').appendChild(el);
-  setTimeout(() => el.remove(), 3000);
-}
-
-// Cerrar modales al clicar fuera
-document.addEventListener('click', e => {
-  if (e.target.classList.contains('modal-overlay')) {
-    e.target.classList.remove('open');
-  }
-  if (e.target.id === 'confirm-overlay') cerrarConfirm();
-});
-
-// ============================================================
-// REPARACIONES — DATOS
-// ============================================================
-let reparaciones = [];
-let editandoReparacionId = null;
-let reparacionActivaId   = null;
-let firmaCtx = null, firmaDibujando = false;
-
-async function cargarReparaciones() {
-  const rows = await apiGet('Reparaciones!A2:M');
-  reparaciones = rows.map(r => ({
-    id: r[0]||'', idReloj: r[1]||'', fechaEntrada: r[2]||'',
-    problema: r[3]||'', estadoVisual: r[4]||'', observaciones: r[5]||'',
-    precio: r[6]||'', presupuestoAceptado: r[7]||'', estado: r[8]||'',
-    fechaEstimada: r[9]||'', fechaEntregaReal: r[10]||'',
-    recogeNombre: r[11]||'', recogeDni: r[12]||'',
-    sinReparar: r[13]||'', motivoSinReparar: r[14]||'', firma: r[15]||''
-  }));
-  renderizarListaReparaciones(reparaciones);
-}
-
-// ============================================================
-// REPARACIONES — HELPERS ESTADO
-// ============================================================
-function badgeEstado(estado) {
-  const map = {
-    'Pendiente de diagnóstico': 'badge-pendiente',
-    'Presupuesto enviado':      'badge-presupuesto',
-    'En reparación':            'badge-en-rep',
-    'Esperando pieza':          'badge-pieza',
-    'Lista para recoger':       'badge-lista',
-    'Entregada':                'badge-entregada'
-  };
-  return map[estado] || 'badge-pendiente';
+  if (relojActivoId) verReloj(relojActivoId);
 }
 
 // ============================================================
 // REPARACIONES — LISTA
 // ============================================================
 function renderizarListaReparaciones(lista) {
-  const el = document.getElementById('lista-reparaciones');
+  var el = document.getElementById('lista-reparaciones');
   if (!lista.length) {
-    el.innerHTML = `<div class="empty-state"><div class="empty-state-icon">🔧</div><div class="empty-state-text">No hay reparaciones. ¡Añade la primera!</div></div>`;
+    el.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🔧</div><div class="empty-state-text">No hay reparaciones. ¡Añade la primera!</div></div>';
     return;
   }
-  el.innerHTML = lista.map(rep => {
-    const reloj   = relojes.find(r => r.id === rep.idReloj);
-    const cliente = reloj ? clientes.find(c => c.id === reloj.idCliente) : null;
-    const marcaModelo = reloj ? `${reloj.marca||'Sin marca'}${reloj.modelo?' · '+reloj.modelo:''}` : '—';
-    const esListaRecoger = rep.estado === 'Lista para recoger';
-    return `
-    <div class="list-item" onclick="verReparacion('${rep.id}')">
-      <div class="list-item-main">
-        <div class="list-item-name">${cliente?.nombre||'—'} — ${marcaModelo}</div>
-        <div class="list-item-sub">${rep.problema?.substring(0,60)||'Sin descripción'}${rep.problema?.length>60?'...':''}</div>
-        <div class="list-item-sub" style="margin-top:3px">${rep.fechaEntrada}${rep.fechaEstimada?' · Estimada: '+rep.fechaEstimada:''}</div>
-      </div>
-      <div class="list-item-actions">
-        <span class="badge ${badgeEstado(rep.estado)}">${rep.estado}</span>
-        ${esListaRecoger ? `<button class="btn btn-primary btn-sm" onclick="event.stopPropagation();abrirModalEntrega('${rep.id}')">Entregar</button>` : ''}
-        <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();abrirModalReparacion(null,'${rep.id}')">Editar</button>
-        <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();confirmarEliminarReparacion('${rep.id}')">✕</button>
-      </div>
-    </div>`;
+  el.innerHTML = lista.map(function(rep) {
+    var reloj = relojes.find(function(r) { return r.id === rep.idReloj; });
+    var cliente = reloj ? clientes.find(function(c) { return c.id === reloj.idCliente; }) : null;
+    return '<div class="list-item" onclick="verReparacion(\'' + rep.id + '\')">' +
+      '<div class="list-item-main">' +
+        '<div class="list-item-name">' + (cliente?cliente.nombre:'—') + ' — ' + nombreReloj(reloj) + '</div>' +
+        '<div class="list-item-sub">' + (rep.problema||'Sin descripción').substring(0,60) + (rep.problema&&rep.problema.length>60?'...':'') + '</div>' +
+        '<div class="list-item-sub" style="margin-top:3px">' + rep.fechaEntrada + (rep.fechaEstimada?' · Estimada: '+rep.fechaEstimada:'') + '</div>' +
+      '</div>' +
+      '<div class="list-item-actions">' +
+        '<span class="badge ' + badgeEstado(rep.estado) + '">' + rep.estado + '</span>' +
+        (rep.estado==='Lista para recoger' ? '<button class="btn btn-primary btn-sm" onclick="event.stopPropagation();abrirModalEntrega(\'' + rep.id + '\')">Entregar</button>' : '') +
+        '<button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();abrirModalReparacion(null,\'' + rep.id + '\')">Editar</button>' +
+        '<button class="btn btn-danger btn-sm" onclick="event.stopPropagation();confirmarEliminarReparacion(\'' + rep.id + '\')">✕</button>' +
+      '</div></div>';
   }).join('');
 }
 
 function filtrarReparaciones() {
-  const q  = document.getElementById('search-reparaciones').value.toLowerCase();
-  const st = document.getElementById('filtro-estado-rep').value;
-  const filtrados = reparaciones.filter(rep => {
-    const reloj   = relojes.find(r => r.id === rep.idReloj);
-    const cliente = reloj ? clientes.find(c => c.id === reloj.idCliente) : null;
-    const texto = [cliente?.nombre, reloj?.marca, reloj?.modelo, rep.problema].join(' ').toLowerCase();
+  var q = document.getElementById('search-reparaciones').value.toLowerCase();
+  var st = document.getElementById('filtro-estado-rep').value;
+  renderizarListaReparaciones(reparaciones.filter(function(rep) {
+    var reloj = relojes.find(function(r) { return r.id === rep.idReloj; });
+    var cliente = reloj ? clientes.find(function(c) { return c.id === reloj.idCliente; }) : null;
+    var texto = [(cliente?cliente.nombre:''), (reloj?reloj.marca:''), (reloj?reloj.modelo:''), rep.problema].join(' ').toLowerCase();
     return texto.includes(q) && (!st || rep.estado === st);
-  });
-  renderizarListaReparaciones(filtrados);
+  }));
 }
 
 // ============================================================
@@ -702,297 +568,372 @@ function filtrarReparaciones() {
 // ============================================================
 function verReparacion(id) {
   reparacionActivaId = id;
-  const rep     = reparaciones.find(x => x.id === id);
+  var rep = reparaciones.find(function(x) { return x.id === id; });
   if (!rep) return;
-  const reloj   = relojes.find(r => r.id === rep.idReloj);
-  const cliente = reloj ? clientes.find(c => c.id === reloj.idCliente) : null;
-  const marcaModelo = reloj ? `${reloj.marca||'Sin marca'}${reloj.modelo?' · '+reloj.modelo:''}` : '—';
-  const esListaRecoger = rep.estado === 'Lista para recoger';
-  const esEntregada    = rep.estado === 'Entregada';
+  var reloj = relojes.find(function(r) { return r.id === rep.idReloj; });
+  var cliente = reloj ? clientes.find(function(c) { return c.id === reloj.idCliente; }) : null;
 
-  document.getElementById('reparaciones-list-view').style.display   = 'none';
+  document.getElementById('reparaciones-list-view').style.display = 'none';
   document.getElementById('reparaciones-detail-view').style.display = 'block';
 
-  document.getElementById('reparaciones-detail-view').innerHTML = `
-    <div class="breadcrumb">
-      <span class="breadcrumb-link" onclick="volverAReparaciones()">Reparaciones</span>
-      <span class="breadcrumb-sep">›</span>
-      <span>${cliente?.nombre||'—'} — ${marcaModelo}</span>
-    </div>
-    <div class="detail-card">
-      <div class="detail-header">
-        <div>
-          <div class="detail-header-title">${marcaModelo}</div>
-          <div class="detail-header-sub">${cliente?.nombre||'—'} · Entrada: ${rep.fechaEntrada}</div>
-        </div>
-        <div class="detail-header-actions">
-          ${esListaRecoger ? `<button class="btn-header" onclick="abrirModalEntrega('${rep.id}')">📋 Entregar</button>` : ''}
-          <button class="btn-header" onclick="abrirModalReparacion(null,'${rep.id}')">✎ Editar</button>
-        </div>
-      </div>
-      <div class="detail-body">
-        <div style="margin-bottom:16px">
-          <span class="badge ${badgeEstado(rep.estado)}" style="font-size:13px;padding:5px 14px">${rep.estado}</span>
-          ${rep.presupuestoAceptado ? `<span class="badge" style="margin-left:8px;background:var(--bg2);color:var(--text2)">Presupuesto: ${rep.presupuestoAceptado}</span>` : ''}
-        </div>
-        <div class="detail-grid">
-          <div class="detail-field" style="grid-column:1/-1">
-            <div class="detail-field-label">Descripción del problema</div>
-            <div class="detail-field-value">${rep.problema||'—'}</div>
-          </div>
-          ${rep.estadoVisual ? `<div class="detail-field" style="grid-column:1/-1">
-            <div class="detail-field-label">Estado visual al entrar</div>
-            <div class="detail-field-value">${rep.estadoVisual}</div>
-          </div>` : ''}
-          ${rep.observaciones ? `<div class="detail-field" style="grid-column:1/-1">
-            <div class="detail-field-label">Observaciones internas</div>
-            <div class="detail-field-value" style="color:var(--text2);font-style:italic">${rep.observaciones}</div>
-          </div>` : ''}
-          <div class="detail-field">
-            <div class="detail-field-label">Presupuesto</div>
-            <div class="detail-field-value mono">${rep.precio ? rep.precio+' €' : '—'}</div>
-          </div>
-          <div class="detail-field">
-            <div class="detail-field-label">Entrega estimada</div>
-            <div class="detail-field-value mono">${rep.fechaEstimada||'—'}</div>
-          </div>
-          ${esEntregada ? `
-          <div class="detail-field">
-            <div class="detail-field-label">Fecha de entrega real</div>
-            <div class="detail-field-value mono">${rep.fechaEntregaReal||'—'}</div>
-          </div>
-          <div class="detail-field">
-            <div class="detail-field-label">Recogido por</div>
-            <div class="detail-field-value">${rep.recogeNombre||'—'}${rep.recogeDni?' ('+rep.recogeDni+')':''}</div>
-          </div>
-          ${rep.sinReparar === 'Sí' ? `<div class="detail-field" style="grid-column:1/-1">
-            <div class="detail-field-label">Entregado sin reparar</div>
-            <div class="detail-field-value" style="color:var(--danger)">${rep.motivoSinReparar||'Sí'}</div>
-          </div>` : ''}
-          ${rep.firma ? `<div class="detail-field" style="grid-column:1/-1">
-            <div class="detail-field-label">Firma</div>
-            <img src="${rep.firma}" style="max-width:280px;border:1px solid var(--border);border-radius:var(--radius);background:white;padding:4px">
-          </div>` : ''}
-          ` : ''}
-        </div>
-        <div class="subsection-title" style="margin-top:8px">
-          Reloj
-        </div>
-        ${reloj ? `
-        <div class="reloj-card" onclick="verCliente('${reloj.idCliente}')">
-          <div class="reloj-card-main">
-            <div class="reloj-card-marca">${reloj.marca||'Sin marca'}${reloj.modelo?' · '+reloj.modelo:''}</div>
-            <div class="reloj-card-modelo">${reloj.movimiento} · ${reloj.clase}</div>
-            ${reloj.serie ? `<div class="reloj-card-ref">N/S: ${reloj.serie}</div>` : ''}
-          </div>
-          <span class="reloj-clase-badge">${reloj.clase}</span>
-        </div>` : '<p style="color:var(--text3);font-size:14px">Reloj no encontrado</p>'}
-      </div>
-    </div>`;
+  var entregaHTML = rep.estado === 'Entregada' ?
+    '<div class="detail-field"><div class="detail-field-label">Fecha de entrega real</div><div class="detail-field-value mono">' + (rep.fechaEntregaReal||'—') + '</div></div>' +
+    '<div class="detail-field"><div class="detail-field-label">Recogido por</div><div class="detail-field-value">' + (rep.recogeNombre||'—') + (rep.recogeDni?' ('+rep.recogeDni+')':'') + '</div></div>' +
+    (rep.sinReparar==='Sí' ? '<div class="detail-field" style="grid-column:1/-1"><div class="detail-field-label">Entregado sin reparar</div><div class="detail-field-value" style="color:var(--danger)">' + (rep.motivoSinReparar||'Sí') + '</div></div>' : '') +
+    (rep.firma ? '<div class="detail-field" style="grid-column:1/-1"><div class="detail-field-label">Firma</div><img src="' + rep.firma + '" style="max-width:280px;border:1px solid var(--border);border-radius:var(--radius);background:white;padding:4px"></div>' : '')
+    : '';
+
+  document.getElementById('reparaciones-detail-view').innerHTML =
+    '<div class="breadcrumb">' +
+      '<span class="breadcrumb-link" onclick="volverAReparaciones()">Reparaciones</span>' +
+      '<span class="breadcrumb-sep">›</span>' +
+      '<span>' + (cliente?cliente.nombre:'—') + ' — ' + nombreReloj(reloj) + '</span>' +
+    '</div>' +
+    '<div class="detail-card">' +
+      '<div class="detail-header">' +
+        '<div>' +
+          '<div class="detail-header-title">' + nombreReloj(reloj) + '</div>' +
+          '<div class="detail-header-sub">' + (cliente?cliente.nombre:'—') + ' · Entrada: ' + rep.fechaEntrada + '</div>' +
+        '</div>' +
+        '<div class="detail-header-actions">' +
+          (rep.estado==='Lista para recoger' ? '<button class="btn-header" onclick="abrirModalEntrega(\'' + rep.id + '\')">📋 Entregar</button>' : '') +
+          '<button class="btn-header" onclick="abrirModalReparacion(null,\'' + rep.id + '\')">✎ Editar</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="detail-body">' +
+        '<div style="margin-bottom:16px">' +
+          '<span class="badge ' + badgeEstado(rep.estado) + '" style="font-size:13px;padding:5px 14px">' + rep.estado + '</span>' +
+          (rep.presupuestoAceptado ? '<span class="badge" style="margin-left:8px;background:var(--bg2);color:var(--text2)">Presupuesto: ' + rep.presupuestoAceptado + '</span>' : '') +
+        '</div>' +
+        '<div class="detail-grid">' +
+          '<div class="detail-field" style="grid-column:1/-1"><div class="detail-field-label">Descripción del problema</div><div class="detail-field-value">' + (rep.problema||'—') + '</div></div>' +
+          (rep.estadoVisual ? '<div class="detail-field" style="grid-column:1/-1"><div class="detail-field-label">Estado visual al entrar</div><div class="detail-field-value">' + rep.estadoVisual + '</div></div>' : '') +
+          (rep.observaciones ? '<div class="detail-field" style="grid-column:1/-1"><div class="detail-field-label">Observaciones internas</div><div class="detail-field-value" style="color:var(--text2);font-style:italic">' + rep.observaciones + '</div></div>' : '') +
+          '<div class="detail-field"><div class="detail-field-label">Presupuesto</div><div class="detail-field-value mono">' + (rep.precio?rep.precio+' €':'—') + '</div></div>' +
+          '<div class="detail-field"><div class="detail-field-label">Entrega estimada</div><div class="detail-field-value mono">' + (rep.fechaEstimada||'—') + '</div></div>' +
+          entregaHTML +
+        '</div>' +
+        (reloj ? '<div class="subsection-title" style="margin-top:8px">Reloj</div>' +
+          '<div class="reloj-card" onclick="verReloj(\'' + reloj.id + '\')">' +
+            '<div class="reloj-card-main">' +
+              '<div class="reloj-card-marca">' + nombreReloj(reloj) + '</div>' +
+              '<div class="reloj-card-modelo">' + reloj.movimiento + ' · ' + reloj.clase + '</div>' +
+              (reloj.serie ? '<div class="reloj-card-ref">N/S: ' + reloj.serie + '</div>' : '') +
+            '</div>' +
+            '<span class="reloj-clase-badge">' + reloj.clase + '</span>' +
+          '</div>' : '') +
+      '</div>' +
+    '</div>';
 }
 
 function volverAReparaciones() {
   reparacionActivaId = null;
-  document.getElementById('reparaciones-list-view').style.display   = 'block';
+  document.getElementById('reparaciones-list-view').style.display = 'block';
   document.getElementById('reparaciones-detail-view').style.display = 'none';
 }
 
 // ============================================================
-// REPARACIONES — MODAL
+// REPARACIONES — MODAL CON CREACIÓN RÁPIDA
 // ============================================================
-function abrirModalReparacion(idRelojFijo = null, idReparacion = null) {
+function abrirModalReparacion(idRelojFijo, idReparacion) {
+  idRelojFijo = idRelojFijo || null;
+  idReparacion = idReparacion || null;
   editandoReparacionId = idReparacion;
-  const rep = idReparacion ? reparaciones.find(x => x.id === idReparacion) : null;
+  var rep = idReparacion ? reparaciones.find(function(x) { return x.id === idReparacion; }) : null;
   document.getElementById('modal-reparacion-title').textContent = rep ? 'Editar reparación' : 'Nueva reparación';
 
-  // Poblar selector de clientes
-  const selCliente = document.getElementById('rep-cliente');
-  selCliente.innerHTML = clientes.map(c => `<option value="${c.id}">${c.nombre}</option>`).join('');
+  ocultarCreacionRapidaCliente();
+  ocultarCreacionRapidaReloj();
 
-  // Si editamos, preseleccionamos el cliente del reloj
+  var selCliente = document.getElementById('rep-cliente');
+  selCliente.innerHTML = clientes.map(function(c) { return '<option value="' + c.id + '">' + c.nombre + '</option>'; }).join('');
+
   if (rep) {
-    const reloj = relojes.find(r => r.id === rep.idReloj);
-    if (reloj) selCliente.value = reloj.idCliente;
+    var relojRep = relojes.find(function(r) { return r.id === rep.idReloj; });
+    if (relojRep) selCliente.value = relojRep.idCliente;
+    actualizarRelojesSelect(rep.idReloj);
+  } else if (idRelojFijo) {
+    var relojFijo = relojes.find(function(r) { return r.id === idRelojFijo; });
+    if (relojFijo) selCliente.value = relojFijo.idCliente;
+    actualizarRelojesSelect(idRelojFijo);
+  } else {
+    actualizarRelojesSelect(null);
   }
-  actualizarRelojesSelect(rep?.idReloj || idRelojFijo);
 
-  document.getElementById('rep-problema').value             = rep?.problema || '';
-  document.getElementById('rep-estado-visual').value        = rep?.estadoVisual || '';
-  document.getElementById('rep-observaciones').value        = rep?.observaciones || '';
-  document.getElementById('rep-precio').value               = rep?.precio || '';
-  document.getElementById('rep-presupuesto-aceptado').value = rep?.presupuestoAceptado || '';
-  document.getElementById('rep-estado').value               = rep?.estado || 'Pendiente de diagnóstico';
-  document.getElementById('rep-fecha-estimada').value       = rep?.fechaEstimada || '';
+  document.getElementById('rep-problema').value             = rep ? rep.problema : '';
+  document.getElementById('rep-estado-visual').value        = rep ? rep.estadoVisual : '';
+  document.getElementById('rep-observaciones').value        = rep ? rep.observaciones : '';
+  document.getElementById('rep-precio').value               = rep ? rep.precio : '';
+  document.getElementById('rep-presupuesto-aceptado').value = rep ? rep.presupuestoAceptado : '';
+  document.getElementById('rep-estado').value               = rep ? rep.estado : 'Pendiente de diagnóstico';
+  document.getElementById('rep-fecha-estimada').value       = rep ? rep.fechaEstimada : '';
 
   abrirModal('modal-reparacion');
 }
 
-function actualizarRelojesSelect(idRelojSeleccionado = null) {
-  const idCliente = document.getElementById('rep-cliente').value;
-  const relojesCliente = relojes.filter(r => r.idCliente === idCliente);
-  const sel = document.getElementById('rep-reloj');
+function actualizarRelojesSelect(idRelojSeleccionado) {
+  var idCliente = document.getElementById('rep-cliente').value;
+  var relojesCliente = relojes.filter(function(r) { return r.idCliente === idCliente; });
+  var sel = document.getElementById('rep-reloj');
   if (!relojesCliente.length) {
-    sel.innerHTML = `<option value="">— Este cliente no tiene relojes —</option>`;
-    return;
+    sel.innerHTML = '<option value="">— Sin relojes registrados —</option>';
+  } else {
+    sel.innerHTML = relojesCliente.map(function(r) {
+      return '<option value="' + r.id + '" ' + (r.id===idRelojSeleccionado?'selected':'') + '>' + nombreReloj(r) + '</option>';
+    }).join('');
   }
-  sel.innerHTML = relojesCliente.map(r =>
-    `<option value="${r.id}" ${r.id === idRelojSeleccionado ? 'selected' : ''}>${r.marca||'Sin marca'}${r.modelo?' · '+r.modelo:''}</option>`
-  ).join('');
+  ocultarCreacionRapidaReloj();
+}
+
+// Creación rápida — Cliente
+function mostrarCreacionRapidaCliente() {
+  document.getElementById('rep-nuevo-cliente-panel').style.display = 'block';
+  document.getElementById('rep-nc-nombre').focus();
+}
+
+function ocultarCreacionRapidaCliente() {
+  var p = document.getElementById('rep-nuevo-cliente-panel');
+  if (p) {
+    p.style.display = 'none';
+    p.querySelectorAll('input').forEach(function(i) { i.value = ''; });
+  }
+}
+
+async function guardarClienteRapido() {
+  var nombre   = document.getElementById('rep-nc-nombre').value.trim();
+  var telefono = document.getElementById('rep-nc-telefono').value.trim();
+  var dni      = document.getElementById('rep-nc-dni').value.trim();
+  if (!nombre) { toast('El nombre es obligatorio', 'error'); return; }
+  var id = uid(), codigo = codigoCliente('Particular'), fecha = hoy();
+  await apiAppend('Clientes', [id, codigo, 'Particular', nombre, '', telefono, dni, '', '', '', fecha]);
+  clientes.push({ id: id, codigo: codigo, tipo: 'Particular', nombre: nombre, comercio: '', telefono: telefono, dni: dni, direccion: '', email: '', anotaciones: '', fechaMod: fecha });
+  var sel = document.getElementById('rep-cliente');
+  sel.innerHTML = clientes.map(function(c) { return '<option value="' + c.id + '">' + c.nombre + '</option>'; }).join('');
+  sel.value = id;
+  actualizarRelojesSelect(null);
+  ocultarCreacionRapidaCliente();
+  renderizarListaClientes(clientes);
+  toast('Cliente "' + nombre + '" creado', 'success');
+}
+
+// Creación rápida — Reloj
+function mostrarCreacionRapidaReloj() {
+  var idCliente = document.getElementById('rep-cliente').value;
+  if (!idCliente) { toast('Primero selecciona o crea un cliente', 'error'); return; }
+  document.getElementById('rep-nuevo-reloj-panel').style.display = 'block';
+  document.getElementById('rep-nr-marca').focus();
+}
+
+function ocultarCreacionRapidaReloj() {
+  var p = document.getElementById('rep-nuevo-reloj-panel');
+  if (p) {
+    p.style.display = 'none';
+    p.querySelectorAll('input').forEach(function(i) { i.value = ''; });
+    p.querySelectorAll('select').forEach(function(s) { s.selectedIndex = 0; });
+  }
+}
+
+async function guardarRelojRapido() {
+  var idCliente = document.getElementById('rep-cliente').value;
+  if (!idCliente) { toast('Selecciona un cliente', 'error'); return; }
+  var marca  = document.getElementById('rep-nr-marca').value.trim();
+  var modelo = document.getElementById('rep-nr-modelo').value.trim();
+  var clase  = document.getElementById('rep-nr-clase').value;
+  var mov    = document.getElementById('rep-nr-movimiento').value;
+  var serie  = document.getElementById('rep-nr-serie').value.trim();
+  var fecha  = hoy(), id = uid();
+  await apiAppend('Relojes', [id, idCliente, fecha, clase, mov, marca, modelo, '', serie, '', '', '', '']);
+  relojes.push({ id: id, idCliente: idCliente, fechaAlta: fecha, clase: clase, movimiento: mov, marca: marca, modelo: modelo, referencia: '', serie: serie, colorCaja: '', materialCorrea: '', anyoAprox: '', descripcion: '' });
+  actualizarRelojesSelect(id);
+  ocultarCreacionRapidaReloj();
+  renderizarListaRelojosGlobal(relojes);
+  toast('Reloj "' + (marca||'nuevo') + '" creado', 'success');
 }
 
 async function guardarReparacion() {
-  const idReloj  = document.getElementById('rep-reloj').value;
-  const problema = val('rep-problema');
+  var idReloj  = document.getElementById('rep-reloj').value;
+  var problema = val('rep-problema');
   if (!idReloj)  { toast('Selecciona un reloj', 'error'); return; }
   if (!problema) { toast('La descripción del problema es obligatoria', 'error'); return; }
-
-  const estadoVisual      = val('rep-estado-visual');
-  const observaciones     = val('rep-observaciones');
-  const precio            = val('rep-precio');
-  const presupAceptado    = val('rep-presupuesto-aceptado');
-  const estado            = val('rep-estado');
-  const fechaEstimada     = val('rep-fecha-estimada');
-  const fechaEntrada      = editandoReparacionId ? reparaciones.find(r=>r.id===editandoReparacionId).fechaEntrada : hoy();
-
+  var estadoVisual = val('rep-estado-visual'), observaciones = val('rep-observaciones');
+  var precio = val('rep-precio'), presupAceptado = val('rep-presupuesto-aceptado');
+  var estado = val('rep-estado'), fechaEstimada = val('rep-fecha-estimada');
+  var fechaEntrada = editandoReparacionId ? reparaciones.find(function(r){ return r.id===editandoReparacionId; }).fechaEntrada : hoy();
   if (editandoReparacionId) {
-    const idx = reparaciones.findIndex(r => r.id === editandoReparacionId);
-    const row = idx + 2;
-    const rep = reparaciones[idx];
-    await apiUpdate(`Reparaciones!A${row}:J${row}`, [
-      editandoReparacionId, idReloj, fechaEntrada, problema, estadoVisual, observaciones,
-      precio, presupAceptado, estado, fechaEstimada
-    ]);
-    reparaciones[idx] = { ...rep, idReloj, problema, estadoVisual, observaciones, precio, presupuestoAceptado: presupAceptado, estado, fechaEstimada };
+    var idx = reparaciones.findIndex(function(r) { return r.id === editandoReparacionId; });
+    var rep = reparaciones[idx];
+    await apiUpdate('Reparaciones!A' + (idx+2) + ':J' + (idx+2), [editandoReparacionId, idReloj, fechaEntrada, problema, estadoVisual, observaciones, precio, presupAceptado, estado, fechaEstimada]);
+    reparaciones[idx] = Object.assign({}, rep, { idReloj: idReloj, problema: problema, estadoVisual: estadoVisual, observaciones: observaciones, precio: precio, presupuestoAceptado: presupAceptado, estado: estado, fechaEstimada: fechaEstimada });
     toast('Reparación actualizada', 'success');
   } else {
-    const id = uid();
-    await apiAppend('Reparaciones', [id, idReloj, fechaEntrada, problema, estadoVisual, observaciones, precio, presupAceptado, estado, fechaEstimada, '', '', '', '', '']);
-    reparaciones.push({ id, idReloj, fechaEntrada, problema, estadoVisual, observaciones, precio, presupuestoAceptado: presupAceptado, estado, fechaEstimada, fechaEntregaReal:'', recogeNombre:'', recogeDni:'', sinReparar:'', motivoSinReparar:'', firma:'' });
+    var newId = uid();
+    await apiAppend('Reparaciones', [newId, idReloj, fechaEntrada, problema, estadoVisual, observaciones, precio, presupAceptado, estado, fechaEstimada, '', '', '', '', '', '']);
+    reparaciones.push({ id: newId, idReloj: idReloj, fechaEntrada: fechaEntrada, problema: problema, estadoVisual: estadoVisual, observaciones: observaciones, precio: precio, presupuestoAceptado: presupAceptado, estado: estado, fechaEstimada: fechaEstimada, fechaEntregaReal: '', recogeNombre: '', recogeDni: '', sinReparar: '', motivoSinReparar: '', firma: '' });
     toast('Reparación creada', 'success');
   }
-
   cerrarModal('modal-reparacion');
   renderizarListaReparaciones(reparaciones);
-  if (reparacionActivaId === editandoReparacionId) verReparacion(editandoReparacionId);
+  if (relojActivoId) verReloj(relojActivoId);
+  if (reparacionActivaId && reparacionActivaId === editandoReparacionId) verReparacion(editandoReparacionId);
 }
 
 // ============================================================
 // ENTREGA CON FIRMA
 // ============================================================
-let reparacionEntregaId = null;
-
 function abrirModalEntrega(idReparacion) {
   reparacionEntregaId = idReparacion;
-  const hoyStr = new Date().toISOString().split('T')[0];
-  document.getElementById('ent-fecha').value          = hoyStr;
-  document.getElementById('ent-sin-reparar').value    = 'No';
-  document.getElementById('ent-motivo').value         = '';
-  document.getElementById('ent-recoge-nombre').value  = '';
-  document.getElementById('ent-recoge-dni').value     = '';
+  document.getElementById('ent-fecha').value         = new Date().toISOString().split('T')[0];
+  document.getElementById('ent-sin-reparar').value   = 'No';
+  document.getElementById('ent-motivo').value        = '';
+  document.getElementById('ent-recoge-nombre').value = '';
+  document.getElementById('ent-recoge-dni').value    = '';
   document.getElementById('motivo-sin-reparar-grupo').style.display = 'none';
-
   abrirModal('modal-entrega');
-
-  setTimeout(() => {
-    iniciarFirma();
-  }, 100);
+  setTimeout(iniciarFirma, 150);
 }
 
 function toggleMotivoSinReparar() {
-  const val = document.getElementById('ent-sin-reparar').value;
-  document.getElementById('motivo-sin-reparar-grupo').style.display = val === 'Sí' ? 'block' : 'none';
+  document.getElementById('motivo-sin-reparar-grupo').style.display =
+    document.getElementById('ent-sin-reparar').value === 'Sí' ? 'block' : 'none';
 }
 
 function iniciarFirma() {
-  const canvas = document.getElementById('firma-canvas');
+  var canvas = document.getElementById('firma-canvas');
   if (!canvas) return;
-  // Ajustar resolución al tamaño real
-  const rect = canvas.getBoundingClientRect();
+  var rect = canvas.getBoundingClientRect();
   canvas.width  = rect.width  * window.devicePixelRatio;
   canvas.height = rect.height * window.devicePixelRatio;
   firmaCtx = canvas.getContext('2d');
   firmaCtx.scale(window.devicePixelRatio, window.devicePixelRatio);
   firmaCtx.strokeStyle = '#1A1814';
-  firmaCtx.lineWidth   = 2;
-  firmaCtx.lineCap     = 'round';
-  firmaCtx.lineJoin    = 'round';
-
-  const getPos = (e) => {
-    const r = canvas.getBoundingClientRect();
-    const src = e.touches ? e.touches[0] : e;
-    return { x: src.clientX - r.left, y: src.clientY - r.top };
-  };
-
-  canvas.onmousedown  = canvas.ontouchstart = (e) => { e.preventDefault(); firmaDibujando = true; const p = getPos(e); firmaCtx.beginPath(); firmaCtx.moveTo(p.x, p.y); };
-  canvas.onmousemove  = canvas.ontouchmove  = (e) => { e.preventDefault(); if (!firmaDibujando) return; const p = getPos(e); firmaCtx.lineTo(p.x, p.y); firmaCtx.stroke(); };
-  canvas.onmouseup    = canvas.ontouchend   = ()  => { firmaDibujando = false; };
-  canvas.onmouseleave = ()  => { firmaDibujando = false; };
+  firmaCtx.lineWidth = 2;
+  firmaCtx.lineCap = 'round';
+  firmaCtx.lineJoin = 'round';
+  function getPos(e) {
+    var r = canvas.getBoundingClientRect();
+    var s = e.touches ? e.touches[0] : e;
+    return { x: s.clientX - r.left, y: s.clientY - r.top };
+  }
+  canvas.onmousedown = canvas.ontouchstart = function(e) { e.preventDefault(); firmaDibujando = true; var p = getPos(e); firmaCtx.beginPath(); firmaCtx.moveTo(p.x, p.y); };
+  canvas.onmousemove = canvas.ontouchmove  = function(e) { e.preventDefault(); if (!firmaDibujando) return; var p = getPos(e); firmaCtx.lineTo(p.x, p.y); firmaCtx.stroke(); };
+  canvas.onmouseup   = canvas.ontouchend   = function() { firmaDibujando = false; };
+  canvas.onmouseleave = function() { firmaDibujando = false; };
 }
 
 function limpiarFirma() {
   if (!firmaCtx) return;
-  const canvas = document.getElementById('firma-canvas');
+  var canvas = document.getElementById('firma-canvas');
   firmaCtx.clearRect(0, 0, canvas.width, canvas.height);
 }
 
-async function confirmarEntrega() {
-  const canvas       = document.getElementById('firma-canvas');
-  const fechaReal    = document.getElementById('ent-fecha').value;
-  const recogeNombre = val('ent-recoge-nombre');
-  const recogeDni    = val('ent-recoge-dni');
-  const sinReparar   = val('ent-sin-reparar');
-  const motivo       = val('ent-motivo');
+function esCanvasVacio(canvas) {
+  var data = canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height).data;
+  for (var i = 0; i < data.length; i++) { if (data[i] !== 0) return false; }
+  return true;
+}
 
+async function confirmarEntrega() {
+  var canvas       = document.getElementById('firma-canvas');
+  var fechaReal    = document.getElementById('ent-fecha').value;
+  var recogeNombre = val('ent-recoge-nombre');
+  var recogeDni    = val('ent-recoge-dni');
+  var sinReparar   = val('ent-sin-reparar');
+  var motivo       = val('ent-motivo');
   if (!fechaReal)    { toast('Indica la fecha de entrega', 'error'); return; }
   if (!recogeNombre) { toast('Indica quién recoge', 'error'); return; }
-
-  // Comprobar si hay firma
-  const firmaDataUrl = canvas.toDataURL('image/png');
-  const firmaVacia   = !firmaCtx || esCanvasVacio(canvas);
-  if (firmaVacia) { toast('Por favor recoge la firma del cliente', 'error'); return; }
-
-  const idx = reparaciones.findIndex(r => r.id === reparacionEntregaId);
+  if (esCanvasVacio(canvas)) { toast('Por favor recoge la firma del cliente', 'error'); return; }
+  var firmaDataUrl = canvas.toDataURL('image/png');
+  var idx = reparaciones.findIndex(function(r) { return r.id === reparacionEntregaId; });
   if (idx === -1) return;
-  const row = idx + 2;
-  const rep = reparaciones[idx];
-
-  // Columnas K:P (11:16) = fechaEntregaReal, recogeNombre, recogeDni, sinReparar, motivoSinReparar, firma
-  await apiUpdate(`Reparaciones!A${row}:P${row}`, [
+  var rep = reparaciones[idx];
+  await apiUpdate('Reparaciones!A' + (idx+2) + ':P' + (idx+2), [
     rep.id, rep.idReloj, rep.fechaEntrada, rep.problema, rep.estadoVisual,
     rep.observaciones, rep.precio, rep.presupuestoAceptado, 'Entregada',
     rep.fechaEstimada, fechaReal, recogeNombre, recogeDni, sinReparar, motivo, firmaDataUrl
   ]);
-
-  reparaciones[idx] = { ...rep, estado: 'Entregada', fechaEntregaReal: fechaReal, recogeNombre, recogeDni: recogeDni, sinReparar, motivoSinReparar: motivo, firma: firmaDataUrl };
-
+  reparaciones[idx] = Object.assign({}, rep, { estado: 'Entregada', fechaEntregaReal: fechaReal, recogeNombre: recogeNombre, recogeDni: recogeDni, sinReparar: sinReparar, motivoSinReparar: motivo, firma: firmaDataUrl });
   cerrarModal('modal-entrega');
   renderizarListaReparaciones(reparaciones);
+  if (relojActivoId) verReloj(relojActivoId);
   if (reparacionActivaId === reparacionEntregaId) verReparacion(reparacionEntregaId);
   toast('Entrega registrada correctamente', 'success');
 }
 
-function esCanvasVacio(canvas) {
-  const ctx  = canvas.getContext('2d');
-  const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-  return !data.some(ch => ch !== 0);
+// ============================================================
+// ELIMINAR
+// ============================================================
+function confirmarEliminarCliente(id, nombre) {
+  mostrarConfirm('¿Eliminar cliente?', 'Se eliminará a "' + nombre + '" y todos sus relojes. Esta acción no se puede deshacer.', async function() {
+    await eliminarFilaPorId('Clientes', id);
+    var suyos = relojes.filter(function(r) { return r.idCliente === id; });
+    for (var i = 0; i < suyos.length; i++) await eliminarFilaPorId('Relojes', suyos[i].id);
+    clientes = clientes.filter(function(c) { return c.id !== id; });
+    relojes  = relojes.filter(function(r) { return r.idCliente !== id; });
+    renderizarListaClientes(clientes);
+    renderizarListaRelojosGlobal(relojes);
+    if (clienteActivoId === id) volverAClientes();
+    toast('Cliente eliminado', 'success');
+  });
+}
+
+function confirmarEliminarReloj(id, marca) {
+  mostrarConfirm('¿Eliminar reloj?', 'Se eliminará el reloj "' + (marca||'sin marca') + '". Esta acción no se puede deshacer.', async function() {
+    await eliminarFilaPorId('Relojes', id);
+    relojes = relojes.filter(function(r) { return r.id !== id; });
+    renderizarListaRelojosGlobal(relojes);
+    if (clienteActivoId) verCliente(clienteActivoId);
+    if (relojActivoId === id) volverAClientes();
+    toast('Reloj eliminado', 'success');
+  });
+}
+
+function confirmarEliminarReparacion(id) {
+  mostrarConfirm('¿Eliminar reparación?', 'Se eliminará esta reparación. Esta acción no se puede deshacer.', async function() {
+    await eliminarFilaPorId('Reparaciones', id);
+    reparaciones = reparaciones.filter(function(r) { return r.id !== id; });
+    renderizarListaReparaciones(reparaciones);
+    if (reparacionActivaId === id) volverAReparaciones();
+    toast('Reparación eliminada', 'success');
+  });
+}
+
+async function eliminarFilaPorId(hoja, id) {
+  var rows = await apiGet(hoja + '!A2:A');
+  var rowIdx = rows.findIndex(function(r) { return r[0] === id; });
+  if (rowIdx === -1) return;
+  var sheetIdMap = await getSheetIds();
+  var sheetId = sheetIdMap[hoja];
+  if (sheetId === undefined) return;
+  await apiBatchUpdate([{ deleteDimension: { range: { sheetId: sheetId, dimension: 'ROWS', startIndex: rowIdx + 1, endIndex: rowIdx + 2 } } }]);
 }
 
 // ============================================================
-// REPARACIONES — ELIMINAR
+// UI HELPERS
 // ============================================================
-function confirmarEliminarReparacion(id) {
-  mostrarConfirm(
-    '¿Eliminar reparación?',
-    'Se eliminará esta reparación. Esta acción no se puede deshacer.',
-    async () => {
-      await eliminarFilaPorId('Reparaciones', id, reparaciones);
-      reparaciones = reparaciones.filter(r => r.id !== id);
-      renderizarListaReparaciones(reparaciones);
-      if (reparacionActivaId === id) volverAReparaciones();
-      toast('Reparación eliminada', 'success');
-    }
-  );
+function abrirModal(id)  { document.getElementById(id).classList.add('open'); }
+function cerrarModal(id) { document.getElementById(id).classList.remove('open'); }
+
+function mostrarConfirm(title, text, cb) {
+  document.getElementById('confirm-title').textContent = title;
+  document.getElementById('confirm-text').textContent  = text;
+  document.getElementById('confirm-overlay').classList.add('open');
+  document.getElementById('confirm-ok').onclick = async function() { cerrarConfirm(); await cb(); };
 }
+function cerrarConfirm() { document.getElementById('confirm-overlay').classList.remove('open'); }
+
+function toast(msg, tipo) {
+  tipo = tipo || '';
+  var el = document.createElement('div');
+  el.className = 'toast ' + tipo;
+  el.textContent = msg;
+  document.getElementById('toast-container').appendChild(el);
+  setTimeout(function() { el.remove(); }, 3000);
+}
+
+document.addEventListener('click', function(e) {
+  if (e.target.classList.contains('modal-overlay')) e.target.classList.remove('open');
+  if (e.target.id === 'confirm-overlay') cerrarConfirm();
+});
 
 // ============================================================
 // INIT
