@@ -608,6 +608,34 @@
   .confirm-text { font-size: 14px; color: var(--text2); margin-bottom: 24px; }
   .confirm-actions { display: flex; gap: 10px; justify-content: flex-end; }
 
+  /* ESTADO REPARACION BADGES */
+  .badge-pendiente    { background:#F0EDE6; color:#5C5748; }
+  .badge-presupuesto  { background:#EEF1F9; color:#3A4E8C; }
+  .badge-en-rep       { background:#E8F0EC; color:#2B4D3F; }
+  .badge-pieza        { background:#F5F0E4; color:#7A5C1E; }
+  .badge-lista        { background:#FFF0E0; color:#B05A10; }
+  .badge-entregada    { background:#F0F0F0; color:#666; }
+
+  /* FIRMA */
+  #firma-canvas { cursor: crosshair; }
+
+  /* REPARACION CARD */
+  .rep-card {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .rep-card:hover { background: var(--bg2); border-color: var(--border2); }
+  .rep-card-header { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+  .rep-card-title { font-weight:500; font-size:15px; }
+  .rep-card-sub { font-size:13px; color:var(--text2); margin-top:3px; }
+  .rep-card-meta { font-size:12px; color:var(--text3); font-family:var(--font-mono); margin-top:6px; }
+  .rep-card-actions { display:flex; gap:6px; flex-shrink:0; flex-wrap:wrap; justify-content:flex-end; }
+
   /* RESPONSIVE */
   @media (max-width: 600px) {
     main { padding: 16px; }
@@ -647,7 +675,7 @@
   <nav>
     <button class="nav-tab active" onclick="showPanel('clientes')">Clientes</button>
     <button class="nav-tab" onclick="showPanel('relojes')">Relojes</button>
-    <button class="nav-tab" onclick="showPanel('reparaciones')" style="opacity:0.5;pointer-events:none">Reparaciones</button>
+    <button class="nav-tab" onclick="showPanel('reparaciones')">Reparaciones</button>
     <button class="nav-tab" onclick="showPanel('pedidos')" style="opacity:0.5;pointer-events:none">Pedidos</button>
     <button class="nav-tab" onclick="showPanel('consultas')" style="opacity:0.5;pointer-events:none">Consultas</button>
   </nav>
@@ -682,6 +710,31 @@
       <div class="list-container" id="lista-relojes-global">
         <div class="loading"><span class="spinner"></span> Cargando relojes...</div>
       </div>
+    </div>
+    <!-- PANEL REPARACIONES -->
+    <div id="panel-reparaciones" class="panel">
+      <div id="reparaciones-list-view">
+        <div class="section-header">
+          <div class="section-title">Reparaciones</div>
+          <button class="btn btn-primary" onclick="abrirModalReparacion(null,null)">+ Nueva reparación</button>
+        </div>
+        <div class="search-bar">
+          <input type="text" class="search-input" placeholder="Buscar por cliente, marca o descripción..." id="search-reparaciones" oninput="filtrarReparaciones()">
+          <select class="form-select" style="width:200px;flex-shrink:0" id="filtro-estado-rep" onchange="filtrarReparaciones()">
+            <option value="">Todos los estados</option>
+            <option>Pendiente de diagnóstico</option>
+            <option>Presupuesto enviado</option>
+            <option>En reparación</option>
+            <option>Esperando pieza</option>
+            <option>Lista para recoger</option>
+            <option>Entregada</option>
+          </select>
+        </div>
+        <div class="list-container" id="lista-reparaciones">
+          <div class="loading"><span class="spinner"></span> Cargando reparaciones...</div>
+        </div>
+      </div>
+      <div id="reparaciones-detail-view" style="display:none"></div>
     </div>
   </main>
 </div>
@@ -806,15 +859,125 @@
           <label class="form-label">Descripción / características</label>
           <textarea class="form-textarea" id="r-descripcion" placeholder="Detalles adicionales del reloj..."></textarea>
         </div>
-        <div class="form-group full">
-          <label class="form-label">Estado visual al entrar</label>
-          <textarea class="form-textarea" id="r-estado-visual" placeholder="Rasguños, golpes, estado de la correa..."></textarea>
-        </div>
+
       </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="cerrarModal('modal-reloj')">Cancelar</button>
       <button class="btn btn-primary" onclick="guardarReloj()">Guardar reloj</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL REPARACION -->
+<div class="modal-overlay" id="modal-reparacion">
+  <div class="modal" style="max-width:620px">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-reparacion-title">Nueva reparación</div>
+      <button class="modal-close" onclick="cerrarModal('modal-reparacion')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group full" id="rep-cliente-selector">
+          <label class="form-label">Cliente *</label>
+          <select class="form-select" id="rep-cliente" onchange="actualizarRelojesSelect()"></select>
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Reloj *</label>
+          <select class="form-select" id="rep-reloj"></select>
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Descripción del problema *</label>
+          <textarea class="form-textarea" id="rep-problema" placeholder="¿Qué le pasa al reloj?"></textarea>
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Estado visual al entrar</label>
+          <textarea class="form-textarea" id="rep-estado-visual" placeholder="Rasguños, golpes, estado de la correa..."></textarea>
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Observaciones internas</label>
+          <textarea class="form-textarea" id="rep-observaciones" placeholder="Notas solo visibles para el taller..."></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Presupuesto (€)</label>
+          <input type="number" class="form-input" id="rep-precio" placeholder="0.00" step="0.01" min="0">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Presupuesto aceptado</label>
+          <select class="form-select" id="rep-presupuesto-aceptado">
+            <option value="">Pendiente</option>
+            <option value="Sí">Sí</option>
+            <option value="No">No</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Estado</label>
+          <select class="form-select" id="rep-estado">
+            <option>Pendiente de diagnóstico</option>
+            <option>Presupuesto enviado</option>
+            <option>En reparación</option>
+            <option>Esperando pieza</option>
+            <option>Lista para recoger</option>
+            <option>Entregada</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Fecha de entrega estimada</label>
+          <input type="date" class="form-input" id="rep-fecha-estimada">
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="cerrarModal('modal-reparacion')">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarReparacion()">Guardar reparación</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL ENTREGA (firma) -->
+<div class="modal-overlay" id="modal-entrega">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-header">
+      <div class="modal-title">Registrar entrega</div>
+      <button class="modal-close" onclick="cerrarModal('modal-entrega')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label">Fecha de entrega</label>
+          <input type="date" class="form-input" id="ent-fecha">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Entregado sin reparar</label>
+          <select class="form-select" id="ent-sin-reparar" onchange="toggleMotivoSinReparar()">
+            <option value="No">No — reparación completada</option>
+            <option value="Sí">Sí — se devuelve sin reparar</option>
+          </select>
+        </div>
+        <div class="form-group full" id="motivo-sin-reparar-grupo" style="display:none">
+          <label class="form-label">Motivo de devolución sin reparar</label>
+          <textarea class="form-textarea" id="ent-motivo" placeholder="Presupuesto no aceptado, irreparable..."></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Recoge — Nombre</label>
+          <input type="text" class="form-input" id="ent-recoge-nombre" placeholder="Nombre de quien recoge">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Recoge — DNI</label>
+          <input type="text" class="form-input" id="ent-recoge-dni" placeholder="DNI de quien recoge">
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Firma del cliente</label>
+          <div style="border:1px solid var(--border);border-radius:var(--radius);background:white;overflow:hidden">
+            <canvas id="firma-canvas" width="500" height="180" style="width:100%;touch-action:none;display:block;cursor:crosshair"></canvas>
+          </div>
+          <button class="btn btn-secondary btn-sm" style="margin-top:8px;align-self:flex-start" onclick="limpiarFirma()">Borrar firma</button>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="cerrarModal('modal-entrega')">Cancelar</button>
+      <button class="btn btn-primary" onclick="confirmarEntrega()">Confirmar entrega</button>
     </div>
   </div>
 </div>
@@ -1299,7 +1462,6 @@ function abrirModalReloj(idCliente = null, idReloj = null) {
   document.getElementById('r-correa').value      = r?.materialCorrea || '';
   document.getElementById('r-anyo').value        = r?.anyoAprox || '';
   document.getElementById('r-descripcion').value = r?.descripcion || '';
-  document.getElementById('r-estado-visual').value = r?.estadoVisual || '';
 
   abrirModal('modal-reloj');
 }
@@ -1329,15 +1491,15 @@ async function guardarReloj() {
   if (editandoRelojId) {
     const idx = relojes.findIndex(r => r.id === editandoRelojId);
     const row = idx + 2;
-    await apiUpdate(`Relojes!A${row}:N${row}`, [
-      editandoRelojId, idCliente, fecha, clase, movimiento, marca, modelo, referencia, serie, colorCaja, correa, anyo, desc, estadoVis
+    await apiUpdate(`Relojes!A${row}:M${row}`, [
+      editandoRelojId, idCliente, fecha, clase, movimiento, marca, modelo, referencia, serie, colorCaja, correa, anyo, desc
     ]);
-    relojes[idx] = { id: editandoRelojId, idCliente, fechaAlta: fecha, clase, movimiento, marca, modelo, referencia, serie, colorCaja, materialCorrea: correa, anyoAprox: anyo, descripcion: desc, estadoVisual: estadoVis };
+    relojes[idx] = { id: editandoRelojId, idCliente, fechaAlta: fecha, clase, movimiento, marca, modelo, referencia, serie, colorCaja, materialCorrea: correa, anyoAprox: anyo, descripcion: desc };
     toast('Reloj actualizado', 'success');
   } else {
     const id = uid();
-    await apiAppend('Relojes', [id, idCliente, fecha, clase, movimiento, marca, modelo, referencia, serie, colorCaja, correa, anyo, desc, estadoVis]);
-    relojes.push({ id, idCliente, fechaAlta: fecha, clase, movimiento, marca, modelo, referencia, serie, colorCaja, materialCorrea: correa, anyoAprox: anyo, descripcion: desc, estadoVisual: estadoVis });
+    await apiAppend('Relojes', [id, idCliente, fecha, clase, movimiento, marca, modelo, referencia, serie, colorCaja, correa, anyo, desc]);
+    relojes.push({ id, idCliente, fechaAlta: fecha, clase, movimiento, marca, modelo, referencia, serie, colorCaja, materialCorrea: correa, anyoAprox: anyo, descripcion: desc });
     toast('Reloj añadido', 'success');
   }
 
