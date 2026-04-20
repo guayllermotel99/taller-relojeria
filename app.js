@@ -8,7 +8,7 @@ const SCOPES    = 'https://www.googleapis.com/auth/spreadsheets';
 const HEADERS = {
   Clientes:     ['Id_Cliente','Codigo_Cliente','Tipo_Cliente','Nombre_Completo','Nombre_Comercio','Telefono','DNI_CIF','Direccion','Email','Anotaciones','Fecha_Modificacion'],
   Relojes:      ['Id_Reloj','Id_Cliente','Fecha_Alta','Clase','Movimiento','Marca','Modelo','Referencia','Num_Serie','Color_Caja','Material_Correa','Anyo_Aprox','Descripcion'],
-  Reparaciones: ['Id_Reparacion','Numero_Reparacion','Id_Reloj','Fecha_Entrada','Descripcion_Problema','Estado_Visual','Observaciones_Internas','Precio_Presupuesto','Presupuesto_Aceptado','Estado','Fecha_Entrega_Estimada','Fecha_Entrega_Real','Recoge_Nombre','Recoge_DNI','Sin_Reparar','Motivo_Sin_Reparar','Firma_Base64'],
+  Reparaciones: ['Id_Reparacion','Numero_Reparacion','Id_Reloj','Fecha_Entrada','Descripcion_Problema','Estado_Visual','Observaciones_Internas','Precio_Presupuesto','A_Cuenta','Presupuesto_Aceptado','Estado','Fecha_Entrega_Estimada','Fecha_Entrega_Real','Recoge_Nombre','Recoge_DNI','Sin_Reparar','Motivo_Sin_Reparar','Firma_Base64'],
   Pedidos:      ['Id_Pedido','Id_Cliente','Id_Reloj','Id_Reparacion','Descripcion_Pieza','Referencia_Marca','Proveedor','Precio','Estado','Fecha_Pedido','Fecha_Llegada_Estimada','Fecha_Llegada_Real','Notas'],
   Consultas:    ['Id_Consulta','Id_Cliente','Id_Reloj','Id_Reparacion','Asunto','Descripcion','Respuesta','Estado','Fecha_Consulta']
 };
@@ -159,14 +159,14 @@ async function cargarRelojes() {
 }
 
 async function cargarReparaciones() {
-  const rows = await apiGet('Reparaciones!A2:Q');
+  const rows = await apiGet('Reparaciones!A2:R');
   reparaciones = rows.map(function(r) { return {
     id: r[0]||'', numero: r[1]||'', idReloj: r[2]||'', fechaEntrada: r[3]||'',
     problema: r[4]||'', estadoVisual: r[5]||'', observaciones: r[6]||'',
-    precio: r[7]||'', presupuestoAceptado: r[8]||'', estado: r[9]||'',
-    fechaEstimada: r[10]||'', fechaEntregaReal: r[11]||'',
-    recogeNombre: r[12]||'', recogeDni: r[13]||'',
-    sinReparar: r[14]||'', motivoSinReparar: r[15]||'', firma: r[16]||''
+    precio: r[7]||'', aCuenta: r[8]||'', presupuestoAceptado: r[9]||'', estado: r[10]||'',
+    fechaEstimada: r[11]||'', fechaEntregaReal: r[12]||'',
+    recogeNombre: r[13]||'', recogeDni: r[14]||'',
+    sinReparar: r[15]||'', motivoSinReparar: r[16]||'', firma: r[17]||''
   }; });
   renderizarListaReparaciones(reparaciones);
 }
@@ -641,7 +641,9 @@ function verReparacion(id) {
           '<div class="detail-field" style="grid-column:1/-1"><div class="detail-field-label">Descripción del problema</div><div class="detail-field-value">' + (rep.problema||'—') + '</div></div>' +
           (rep.estadoVisual ? '<div class="detail-field" style="grid-column:1/-1"><div class="detail-field-label">Estado visual al entrar</div><div class="detail-field-value">' + rep.estadoVisual + '</div></div>' : '') +
           (rep.observaciones ? '<div class="detail-field" style="grid-column:1/-1"><div class="detail-field-label">Observaciones internas</div><div class="detail-field-value" style="color:var(--text2);font-style:italic">' + rep.observaciones + '</div></div>' : '') +
-          '<div class="detail-field"><div class="detail-field-label">Presupuesto</div><div class="detail-field-value mono">' + (rep.precio?rep.precio+' €':'—') + '</div></div>' +
+          '<div class="detail-field"><div class="detail-field-label">Precio total</div><div class="detail-field-value mono">' + (rep.precio?rep.precio+' €':'—') + '</div></div>' +
+          '<div class="detail-field"><div class="detail-field-label">A cuenta</div><div class="detail-field-value mono">' + (rep.aCuenta?rep.aCuenta+' €':'—') + '</div></div>' +
+          (rep.precio && rep.aCuenta ? '<div class="detail-field"><div class="detail-field-label">Restan</div><div class="detail-field-value mono" style="color:var(--warning)">' + (parseFloat(rep.precio) - parseFloat(rep.aCuenta)).toFixed(2) + ' €</div></div>' : '') +
           '<div class="detail-field"><div class="detail-field-label">Entrega estimada</div><div class="detail-field-value mono">' + (rep.fechaEstimada||'—') + '</div></div>' +
           entregaHTML +
         '</div>' +
@@ -701,6 +703,7 @@ function abrirModalReparacion(idRelojFijo, idReparacion) {
   document.getElementById('rep-estado-visual').value        = rep ? rep.estadoVisual : '';
   document.getElementById('rep-observaciones').value        = rep ? rep.observaciones : '';
   document.getElementById('rep-precio').value               = rep ? rep.precio : '';
+  document.getElementById('rep-acuenta').value              = rep ? rep.aCuenta : '';
   document.getElementById('rep-presupuesto-aceptado').value = rep ? rep.presupuestoAceptado : '';
   document.getElementById('rep-estado').value               = rep ? rep.estado : 'Pendiente de diagnóstico';
   document.getElementById('rep-fecha-estimada').value       = rep ? rep.fechaEstimada : '';
@@ -841,20 +844,21 @@ async function guardarReparacion() {
   if (!idReloj)  { toast('Selecciona un reloj', 'error'); return; }
   if (!problema) { toast('La descripción del problema es obligatoria', 'error'); return; }
   var estadoVisual = val('rep-estado-visual'), observaciones = val('rep-observaciones');
-  var precio = val('rep-precio'), presupAceptado = val('rep-presupuesto-aceptado');
+  var precio = val('rep-precio'), aCuenta = val('rep-acuenta');
+  var presupAceptado = val('rep-presupuesto-aceptado');
   var estado = val('rep-estado'), fechaEstimada = val('rep-fecha-estimada');
   var fechaEntrada = editandoReparacionId ? reparaciones.find(function(r){ return r.id===editandoReparacionId; }).fechaEntrada : hoy();
   if (editandoReparacionId) {
     var idx = reparaciones.findIndex(function(r) { return r.id === editandoReparacionId; });
     var rep = reparaciones[idx];
-    await apiUpdate('Reparaciones!A' + (idx+2) + ':K' + (idx+2), [editandoReparacionId, rep.numero, idReloj, fechaEntrada, problema, estadoVisual, observaciones, precio, presupAceptado, estado, fechaEstimada]);
-    reparaciones[idx] = Object.assign({}, rep, { idReloj: idReloj, problema: problema, estadoVisual: estadoVisual, observaciones: observaciones, precio: precio, presupuestoAceptado: presupAceptado, estado: estado, fechaEstimada: fechaEstimada });
+    await apiUpdate('Reparaciones!A' + (idx+2) + ':L' + (idx+2), [editandoReparacionId, rep.numero, idReloj, fechaEntrada, problema, estadoVisual, observaciones, precio, aCuenta, presupAceptado, estado, fechaEstimada]);
+    reparaciones[idx] = Object.assign({}, rep, { idReloj: idReloj, problema: problema, estadoVisual: estadoVisual, observaciones: observaciones, precio: precio, aCuenta: aCuenta, presupuestoAceptado: presupAceptado, estado: estado, fechaEstimada: fechaEstimada });
     toast('Reparación actualizada', 'success');
   } else {
     var newId = uid();
     var numero = siguienteNumeroReparacion();
-    await apiAppend('Reparaciones', [newId, numero, idReloj, fechaEntrada, problema, estadoVisual, observaciones, precio, presupAceptado, estado, fechaEstimada, '', '', '', '', '', '']);
-    reparaciones.push({ id: newId, numero: numero, idReloj: idReloj, fechaEntrada: fechaEntrada, problema: problema, estadoVisual: estadoVisual, observaciones: observaciones, precio: precio, presupuestoAceptado: presupAceptado, estado: estado, fechaEstimada: fechaEstimada, fechaEntregaReal: '', recogeNombre: '', recogeDni: '', sinReparar: '', motivoSinReparar: '', firma: '' });
+    await apiAppend('Reparaciones', [newId, numero, idReloj, fechaEntrada, problema, estadoVisual, observaciones, precio, aCuenta, presupAceptado, estado, fechaEstimada, '', '', '', '', '', '']);
+    reparaciones.push({ id: newId, numero: numero, idReloj: idReloj, fechaEntrada: fechaEntrada, problema: problema, estadoVisual: estadoVisual, observaciones: observaciones, precio: precio, aCuenta: aCuenta, presupuestoAceptado: presupAceptado, estado: estado, fechaEstimada: fechaEstimada, fechaEntregaReal: '', recogeNombre: '', recogeDni: '', sinReparar: '', motivoSinReparar: '', firma: '' });
     toast('Reparación ' + numero + ' creada', 'success');
   }
   cerrarModal('modal-reparacion');
@@ -932,9 +936,9 @@ async function confirmarEntrega() {
   var idx = reparaciones.findIndex(function(r) { return r.id === reparacionEntregaId; });
   if (idx === -1) return;
   var rep = reparaciones[idx];
-  await apiUpdate('Reparaciones!A' + (idx+2) + ':Q' + (idx+2), [
+  await apiUpdate('Reparaciones!A' + (idx+2) + ':R' + (idx+2), [
     rep.id, rep.numero, rep.idReloj, rep.fechaEntrada, rep.problema, rep.estadoVisual,
-    rep.observaciones, rep.precio, rep.presupuestoAceptado, 'Entregada',
+    rep.observaciones, rep.precio, rep.aCuenta, rep.presupuestoAceptado, 'Entregada',
     rep.fechaEstimada, fechaReal, recogeNombre, recogeDni, sinReparar, motivo, firmaDataUrl
   ]);
   reparaciones[idx] = Object.assign({}, rep, { estado: 'Entregada', fechaEntregaReal: fechaReal, recogeNombre: recogeNombre, recogeDni: recogeDni, sinReparar: sinReparar, motivoSinReparar: motivo, firma: firmaDataUrl });
@@ -1010,75 +1014,89 @@ function generarResguardoEntrada(rep) {
   var nombreC = cliente ? cliente.nombre    : '—';
   var telC    = cliente ? cliente.telefono  || '—' : '—';
   var dniC    = cliente ? cliente.dni       || '—' : '—';
-  var marcaR  = reloj   ? reloj.marca       || '—' : '—';
-  var modeloR = reloj   ? reloj.modelo      || ''  : '';
-  var serieR  = reloj   ? reloj.serie       || '—' : '—';
-  var claseR  = reloj   ? reloj.clase       || '—' : '—';
+  var marcaR  = reloj   ? (reloj.marca||'') + (reloj.modelo ? ' ' + reloj.modelo : '') : '—';
+  var serieR  = reloj   ? reloj.serie || '—' : '—';
+  var precioStr  = rep.precio  ? rep.precio  + ' EUR' : '—';
+  var aCuentaStr = rep.aCuenta ? rep.aCuenta + ' EUR' : '—';
+  var restanVal  = (rep.precio && rep.aCuenta)
+    ? (parseFloat(rep.precio) - parseFloat(rep.aCuenta)).toFixed(2) + ' EUR'
+    : (rep.precio ? rep.precio + ' EUR' : '—');
+
+  var ticket = CMD.init;
 
   // ── COPIA CLIENTE ──────────────────────────────────────────
-  var ticket = CMD.init;
   ticket += CMD.centerOn;
-  ticket += bold(TALLER.nombre) + '\n';
-  ticket += TALLER.direccion + '\n';
-  ticket += 'Tel: ' + TALLER.telefono + '\n';
+  ticket += bold('        REFER S.L.') + '\n';
+  ticket += 'TODO EN RELOJERIA DESDE 1976\n';
   ticket += linea('=') + '\n';
-  ticket += bold('  RESGUARDO DE ENTRADA') + '\n';
+  ticket += bold('   [PARTE 1: PARA EL CLIENTE]') + '\n';
   ticket += linea('=') + '\n';
   ticket += CMD.centerOff;
 
-  // Número destacado
-  ticket += bold('N. Reparacion: ' + (rep.numero||'—')) + '\n';
-  ticket += 'Fecha entrada: ' + (rep.fechaEntrada||'—') + '\n';
+  ticket += bold('NUMERO REPARACION: ' + (rep.numero||'—')) + '\n';
+  ticket += '\n';
+  ticket += bold('Marca: ') + marcaR + '\n';
+  ticket += bold('Reparacion: ') + '\n';
+  trocear(rep.problema||'—', ANCHO - 2).forEach(function(l) { ticket += '  ' + l + '\n'; });
+  ticket += '\n';
+  ticket += bold('Fecha entrada: ') + (rep.fechaEntrada||'—') + '\n';
+  ticket += bold('Precio total:  ') + precioStr + '\n';
+  ticket += bold('A cuenta:      ') + aCuentaStr + '\n';
+  ticket += bold('Restan:        ') + restanVal + '\n';
   ticket += linea('-') + '\n';
 
-  // Cliente — nombre y tel en negrita
-  ticket += 'CLIENTE\n';
-  ticket += bold('Nombre: ' + nombreC) + '\n';
-  ticket += bold('Tel:    ' + telC) + '\n';
-  ticket += 'DNI:    ' + dniC + '\n';
-  ticket += linea('-') + '\n';
+  // Mensaje WhatsApp
+  ticket += 'Seguimiento de su reparacion:\n';
+  ticket += 'Contactenos via WhatsApp para\n';
+  ticket += 'consultar el estado.\n';
+  ticket += '\n';
+  ticket += bold('WhatsApp: ' + TALLER.telefono) + '\n';
+  ticket += 'Mencione su nombre o numero\n';
+  ticket += 'de orden al escribirnos.\n';
+  ticket += '\n';
 
-  // Reloj
-  ticket += 'RELOJ\n';
-  ticket += 'Marca:  ' + marcaR + (modeloR ? ' ' + modeloR : '') + '\n';
-  ticket += 'Serie:  ' + serieR + '\n';
-  ticket += 'Clase:  ' + claseR + '\n';
-  ticket += linea('-') + '\n';
-
-  // Avería
-  ticket += bold('AVERIA / TRABAJO A REALIZAR') + '\n';
-  trocear(rep.problema||'—', ANCHO).forEach(function(l) { ticket += l + '\n'; });
-
-  if (rep.estadoVisual) {
-    ticket += linea('-') + '\n';
-    ticket += 'Estado visual al entrar:\n';
-    trocear(rep.estadoVisual, ANCHO).forEach(function(l) { ticket += l + '\n'; });
-  }
-
-  ticket += linea('=') + '\n';
   ticket += CMD.centerOn;
-  ticket += 'Gracias por su confianza\n';
+  ticket += bold('Gracias por confiar en nosotros') + '\n';
   ticket += CMD.centerOff;
   ticket += CMD.feed;
   ticket += CMD.cut;
 
   // ── COPIA TALLER ───────────────────────────────────────────
   ticket += CMD.centerOn;
-  ticket += bold('** COPIA TALLER **') + '\n';
+  ticket += bold('   [PARTE 2: PARA EL TALLER]') + '\n';
   ticket += linea('=') + '\n';
   ticket += CMD.centerOff;
 
-  ticket += bold('N. Reparacion: ' + (rep.numero||'—')) + '\n';
-  ticket += 'Fecha: ' + (rep.fechaEntrada||'—') + '\n';
+  ticket += bold('NUMERO REPARACION: ' + (rep.numero||'—')) + '\n';
+  ticket += '\n';
+  ticket += bold('Nombre cliente: ') + nombreC + '\n';
+  ticket += bold('Telefono:       ') + telC + '\n';
+  ticket += 'DNI:            ' + dniC + '\n';
+  ticket += bold('Marca: ') + marcaR + '\n';
+  ticket += 'Serie: ' + serieR + '\n';
+  ticket += '\n';
+  ticket += bold('Reparacion:') + '\n';
+  trocear(rep.problema||'—', ANCHO - 2).forEach(function(l) { ticket += '  ' + l + '\n'; });
+
+  if (rep.estadoVisual) {
+    ticket += '\n';
+    ticket += 'Estado visual al entrar:\n';
+    trocear(rep.estadoVisual, ANCHO - 2).forEach(function(l) { ticket += '  ' + l + '\n'; });
+  }
+
+  ticket += '\n';
+  ticket += bold('Fecha entrada:  ') + (rep.fechaEntrada||'—') + '\n';
+  ticket += bold('Precio total:   ') + precioStr + '\n';
+  ticket += bold('A cuenta:       ') + aCuentaStr + '\n';
+  ticket += bold('Restan:         ') + restanVal + '\n';
   ticket += linea('-') + '\n';
-  ticket += bold('Cliente: ' + nombreC) + '\n';
-  ticket += bold('Tel:     ' + telC) + '\n';
-  ticket += 'Reloj:   ' + marcaR + (modeloR ? ' ' + modeloR : '') + '\n';
-  ticket += 'Serie:   ' + serieR + '\n';
-  ticket += linea('-') + '\n';
-  ticket += bold('AVERIA') + '\n';
-  trocear(rep.problema||'—', ANCHO).forEach(function(l) { ticket += l + '\n'; });
-  ticket += linea('=') + '\n';
+  ticket += 'Anotaciones de taller:\n';
+  ticket += '\n';
+  ticket += '........................................\n';
+  ticket += '........................................\n';
+  ticket += '........................................\n';
+  ticket += '........................................\n';
+  ticket += '........................................\n';
   ticket += CMD.feed;
   ticket += CMD.cut;
 
@@ -1091,53 +1109,55 @@ function generarTicketEntrega(rep) {
   var cliente = reloj ? clientes.find(function(c) { return c.id === reloj.idCliente; }) : null;
   var nombreC = cliente ? cliente.nombre   : '—';
   var telC    = cliente ? cliente.telefono || '—' : '—';
-  var marcaR  = reloj   ? reloj.marca      || '—' : '—';
-  var modeloR = reloj   ? reloj.modelo     || ''  : '';
+  var marcaR  = reloj   ? (reloj.marca||'') + (reloj.modelo ? ' ' + reloj.modelo : '') : '—';
+  var precioStr  = rep.precio  ? rep.precio  + ' EUR' : '—';
+  var aCuentaStr = rep.aCuenta ? rep.aCuenta + ' EUR' : '0.00 EUR';
+  var restanVal  = (rep.precio && rep.aCuenta)
+    ? (parseFloat(rep.precio) - parseFloat(rep.aCuenta)).toFixed(2) + ' EUR'
+    : (rep.precio ? rep.precio + ' EUR' : '—');
 
   var ticket = CMD.init;
   ticket += CMD.centerOn;
-  ticket += bold(TALLER.nombre) + '\n';
-  ticket += TALLER.direccion + '\n';
-  ticket += 'Tel: ' + TALLER.telefono + '\n';
+  ticket += bold('        REFER S.L.') + '\n';
+  ticket += 'TODO EN RELOJERIA DESDE 1976\n';
   ticket += linea('=') + '\n';
   ticket += bold('    TICKET DE ENTREGA') + '\n';
   ticket += linea('=') + '\n';
   ticket += CMD.centerOff;
 
-  ticket += bold('N. Reparacion: ' + (rep.numero||'—')) + '\n';
+  ticket += bold('NUMERO REPARACION: ' + (rep.numero||'—')) + '\n';
   ticket += 'Fecha entrega: ' + (rep.fechaEntregaReal||'—') + '\n';
   ticket += linea('-') + '\n';
 
-  ticket += 'CLIENTE\n';
-  ticket += bold('Nombre: ' + nombreC) + '\n';
-  ticket += bold('Tel:    ' + telC) + '\n';
+  ticket += bold('Nombre: ') + nombreC + '\n';
+  ticket += 'Tel:    ' + telC + '\n';
   ticket += linea('-') + '\n';
 
-  ticket += 'RELOJ\n';
-  ticket += 'Marca:  ' + marcaR + (modeloR ? ' ' + modeloR : '') + '\n';
-  ticket += linea('-') + '\n';
-
-  ticket += bold('TRABAJO REALIZADO') + '\n';
-  trocear(rep.problema||'—', ANCHO).forEach(function(l) { ticket += l + '\n'; });
+  ticket += bold('Marca: ') + marcaR + '\n';
+  ticket += '\n';
+  ticket += bold('Trabajo realizado:') + '\n';
+  trocear(rep.problema||'—', ANCHO - 2).forEach(function(l) { ticket += '  ' + l + '\n'; });
 
   if (rep.sinReparar === 'Sí') {
-    ticket += linea('-') + '\n';
+    ticket += '\n';
     ticket += bold('ENTREGADO SIN REPARAR') + '\n';
     if (rep.motivoSinReparar) {
-      trocear(rep.motivoSinReparar, ANCHO).forEach(function(l) { ticket += l + '\n'; });
+      trocear(rep.motivoSinReparar, ANCHO - 2).forEach(function(l) { ticket += '  ' + l + '\n'; });
     }
   }
 
   ticket += linea('-') + '\n';
   ticket += 'Recoge: ' + (rep.recogeNombre||'—') + '\n';
   if (rep.recogeDni) ticket += 'DNI:    ' + rep.recogeDni + '\n';
-
   ticket += linea('=') + '\n';
-  ticket += CMD.centerOn;
-  ticket += bold('IMPORTE: ' + (rep.precio ? rep.precio + ' EUR' : 'A CONSULTAR')) + '\n';
+
+  ticket += bold('Precio total:  ') + precioStr + '\n';
+  ticket += bold('A cuenta:      ') + aCuentaStr + '\n';
+  ticket += bold('RESTAN:        ') + restanVal + '\n';
   ticket += linea('=') + '\n';
   ticket += '\n';
-  ticket += 'Gracias por su confianza\n';
+  ticket += CMD.centerOn;
+  ticket += bold('Gracias por confiar en nosotros') + '\n';
   ticket += CMD.centerOff;
   ticket += CMD.feed;
   ticket += CMD.cut;
