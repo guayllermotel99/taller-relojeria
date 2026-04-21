@@ -1002,10 +1002,14 @@ var CMD = {
   boldOff:      ESC + 'E\x00',       // Negrita desactivada
   bigOn:        GS  + '!\x11',       // Doble ancho + doble alto
   bigOff:       GS  + '!\x00',       // Tamaño normal
+  tamanoOn:     GS  + '!\x01',       // Doble alto (letra mas grande, mismo ancho)
+  tamanoOff:    GS  + '!\x00',       // Tamaño normal
   centerOn:     ESC + 'a\x01',       // Centrar
   centerOff:    ESC + 'a\x00',       // Alinear izquierda
+  lineSpacing:  ESC + '3\x50',       // Espaciado entre lineas aumentado
+  lineNormal:   ESC + '2',           // Espaciado normal
   cut:          GS  + 'V\x41\x03',   // Corte parcial con margen
-  feed:         ESC + 'd\x04'        // Avanzar 4 líneas antes de cortar
+  feed:         ESC + 'd\x04'        // Avanzar 4 lineas antes de cortar
 };
 
 function linea(char) {
@@ -1054,6 +1058,7 @@ function generarResguardoEntrada(rep) {
     : (rep.precio ? rep.precio + ' EUR' : '—');
 
   var ticket = CMD.init;
+  ticket += CMD.tamanoOn;            // Letra mas grande en todo el ticket
 
   // ── COPIA CLIENTE ──────────────────────────────────────────
   ticket += CMD.centerOn;
@@ -1123,11 +1128,16 @@ function generarResguardoEntrada(rep) {
   ticket += linea('-') + '\n';
   ticket += 'Anotaciones de taller:\n';
   ticket += '\n';
-  ticket += '........................................\n';
-  ticket += '........................................\n';
-  ticket += '........................................\n';
-  ticket += '........................................\n';
-  ticket += '........................................\n';
+  ticket += linea('_') + '\n';
+  ticket += '\n';
+  ticket += linea('_') + '\n';
+  ticket += '\n';
+  ticket += linea('_') + '\n';
+  ticket += '\n';
+  ticket += linea('_') + '\n';
+  ticket += '\n';
+  ticket += linea('_') + '\n';
+  ticket += '\n';
   ticket += CMD.feed;
   ticket += CMD.cut;
 
@@ -1148,6 +1158,7 @@ function generarTicketEntrega(rep) {
     : (rep.precio ? rep.precio + ' EUR' : '—');
 
   var ticket = CMD.init;
+  ticket += CMD.tamanoOn;            // Letra mas grande
   ticket += CMD.centerOn;
   ticket += bold('        REFER S.L.') + '\n';
   ticket += 'TODO EN RELOJERIA DESDE 1976\n';
