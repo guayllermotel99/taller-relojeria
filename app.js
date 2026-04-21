@@ -1196,17 +1196,33 @@ function generarTicketEntrega(rep) {
   return ticket;
 }
 
-// ── ENVÍO A RAWBT / VISTA PREVIA ───────────────────────────
-function imprimirEscPos(datos) {
-  var esMovil = /Android|iPhone|iPad/i.test(navigator.userAgent);
+// ── ENVÍO AL SERVIDOR PUENTE ────────────────────────────────
+var SERVIDOR_IMPRESORA = 'http://192.168.1.134:8765/print';
 
-  if (esMovil) {
-    // Codificar en base64 para RawBT
-    var b64 = btoa(unescape(encodeURIComponent(datos)));
-    var url = 'rawbt://base64/' + b64;
-    window.location.href = url;
-  } else {
-    // En escritorio mostrar vista previa legible
+async function imprimirEscPos(datos) {
+  // Convertir string ESC/POS a bytes y codificar en base64
+  var bytes = new Uint8Array(datos.length);
+  for (var i = 0; i < datos.length; i++) {
+    bytes[i] = datos.charCodeAt(i) & 0xFF;
+  }
+  var b64 = btoa(String.fromCharCode.apply(null, bytes));
+
+  try {
+    var resp = await fetch(SERVIDOR_IMPRESORA, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: b64 })
+    });
+    var resultado = await resp.json();
+    if (resultado.ok) {
+      toast('Ticket enviado a la impresora', 'success');
+    } else {
+      toast('Error impresora: ' + resultado.msg, 'error');
+      abrirVistaPreviaTicket(datos);
+    }
+  } catch (e) {
+    // Si no hay servidor puente, mostrar vista previa
+    toast('Servidor no disponible — mostrando vista previa', '');
     abrirVistaPreviaTicket(datos);
   }
 }
