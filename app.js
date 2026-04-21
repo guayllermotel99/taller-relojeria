@@ -25,8 +25,10 @@ let firmaCtx = null, firmaDibujando = false;
 let _sheetIds = null;
 
 // ============================================================
-// GOOGLE AUTH
+// GOOGLE AUTH — con sesión persistente
 // ============================================================
+var STORED_EMAIL_KEY = 'taller_user_email';
+
 function cargarGoogleScripts() {
   const s1 = document.createElement('script');
   s1.src = 'https://accounts.google.com/gsi/client';
@@ -42,14 +44,39 @@ function initAuth() {
   tokenClient = google.accounts.oauth2.initTokenClient({
     client_id: CLIENT_ID,
     scope: SCOPES,
-    callback: async (resp) => {
-      if (resp.error) { toast('Error al autenticar', 'error'); return; }
+    callback: async function(resp) {
+      if (resp.error) {
+        // Si falla el silencioso, mostrar pantalla de login
+        document.getElementById('auth-screen').style.display = 'flex';
+        document.getElementById('app').style.display = 'none';
+        return;
+      }
       accessToken = resp.access_token;
+      // Guardar email si viene en la respuesta
+      if (resp.email) localStorage.setItem(STORED_EMAIL_KEY, resp.email);
       mostrarApp();
       await inicializarHojas();
       await cargarTodo();
     }
   });
+
+  // Intentar login silencioso si ya hubo sesión antes
+  var emailGuardado = localStorage.getItem(STORED_EMAIL_KEY);
+  if (emailGuardado) {
+    // Pedir token sin mostrar pantalla (prompt vacío)
+    tokenClient.requestAccessToken({ prompt: '', login_hint: emailGuardado });
+  } else {
+    // Primera vez: mostrar pantalla de login
+    document.getElementById('auth-screen').style.display = 'flex';
+  }
+
+  // Renovar token automáticamente cada 50 minutos (caduca a los 60)
+  setInterval(function() {
+    var email = localStorage.getItem(STORED_EMAIL_KEY);
+    if (accessToken && email) {
+      tokenClient.requestAccessToken({ prompt: '', login_hint: email });
+    }
+  }, 50 * 60 * 1000);
 }
 
 async function initGapiClient() {
@@ -58,12 +85,13 @@ async function initGapiClient() {
 
 function handleSignIn() {
   if (!tokenClient) { toast('Cargando Google...', ''); return; }
-  tokenClient.requestAccessToken({ prompt: 'consent' });
+  tokenClient.requestAccessToken({ prompt: 'select_account' });
 }
 
 function handleSignOut() {
   if (accessToken) google.accounts.oauth2.revoke(accessToken);
   accessToken = null;
+  localStorage.removeItem(STORED_EMAIL_KEY);
   document.getElementById('auth-screen').style.display = 'flex';
   document.getElementById('app').style.display = 'none';
 }
@@ -71,6 +99,9 @@ function handleSignOut() {
 function mostrarApp() {
   document.getElementById('auth-screen').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
+  // Mostrar email en la cabecera
+  var email = localStorage.getItem(STORED_EMAIL_KEY);
+  if (email) document.getElementById('user-email').textContent = email;
 }
 
 // ============================================================
