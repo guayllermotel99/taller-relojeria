@@ -657,8 +657,6 @@ function verReparacion(id) {
           '<div class="detail-header-sub">' + (cliente?cliente.nombre:'—') + ' · ' + (rep.numero||rep.id) + ' · Entrada: ' + rep.fechaEntrada + '</div>' +
         '</div>' +
         '<div class="detail-header-actions">' +
-          '<button class="btn-header" onclick="abrirModalPedido(\'\',\'' + rep.idReloj + '\',\'' + rep.id + '\',null)">+ Pedido</button>' +
-          '<button class="btn-header" onclick="abrirModalConsulta(\'\',\'' + rep.idReloj + '\',\'' + rep.id + '\',null)">+ Consulta</button>' +
           '<button class="btn-header" onclick="imprimirResguardoEntrada(\'' + rep.id + '\')">🖨 Resguardo</button>' +
           (rep.estado==='Entregada' ? '<button class="btn-header" onclick="imprimirTicketEntrega(\'' + rep.id + '\')">🖨 Entrega</button>' : '') +
           (rep.estado==='Lista para recoger' ? '<button class="btn-header" onclick="abrirModalEntrega(\'' + rep.id + '\')">📋 Entregar</button>' : '') +
@@ -689,16 +687,16 @@ function verReparacion(id) {
             '</div>' +
             '<span class="reloj-clase-badge">' + reloj.clase + '</span>' +
           '</div>' : '') +
-        htmlPedidosDeReparacion(rep.id) +
-        htmlConsultasDeReparacion(rep.id) +
+        htmlPedidosDeReparacion(rep.id, reloj ? reloj.idCliente : '', rep.idReloj) +
+        htmlConsultasDeReparacion(rep.id, reloj ? reloj.idCliente : '', rep.idReloj) +
       '</div>' +
     '</div>';
 }
 
-function htmlPedidosDeReparacion(idReparacion) {
+function htmlPedidosDeReparacion(idReparacion, idCliente, idReloj) {
   var lista = pedidos.filter(function(p) { return p.idReparacion === idReparacion; });
   var html = '<div class="subsection-title" style="margin-top:16px">Pedidos <small style="font-size:14px;font-weight:400;color:var(--text3)">(' + lista.length + ')</small>' +
-    '<button class="btn btn-secondary btn-sm" onclick="abrirModalPedido(\'\',\'\',\'' + idReparacion + '\',null)">+ Añadir</button></div>';
+    '<button class="btn btn-primary btn-sm" onclick="abrirModalPedido(\'' + (idCliente||'') + '\',\'' + (idReloj||'') + '\',\'' + idReparacion + '\',null)">+ Añadir pedido</button></div>';
   if (!lista.length) return html + '<div style="font-size:13px;color:var(--text3);padding:8px 0 16px">Sin pedidos asociados.</div>';
   return html + lista.map(function(p) {
     return '<div class="rep-card" onclick="abrirModalPedido(\'\',\'\',\'\',\'' + p.id + '\')">' +
@@ -715,10 +713,10 @@ function htmlPedidosDeReparacion(idReparacion) {
   }).join('');
 }
 
-function htmlConsultasDeReparacion(idReparacion) {
+function htmlConsultasDeReparacion(idReparacion, idCliente, idReloj) {
   var lista = consultas.filter(function(c) { return c.idReparacion === idReparacion; });
   var html = '<div class="subsection-title" style="margin-top:8px">Consultas <small style="font-size:14px;font-weight:400;color:var(--text3)">(' + lista.length + ')</small>' +
-    '<button class="btn btn-secondary btn-sm" onclick="abrirModalConsulta(\'\',\'\',\'' + idReparacion + '\',null)">+ Añadir</button></div>';
+    '<button class="btn btn-primary btn-sm" onclick="abrirModalConsulta(\'' + (idCliente||'') + '\',\'' + (idReloj||'') + '\',\'' + idReparacion + '\',null)">+ Añadir consulta</button></div>';
   if (!lista.length) return html + '<div style="font-size:13px;color:var(--text3);padding:8px 0 16px">Sin consultas asociadas.</div>';
   return html + lista.map(function(c) {
     return '<div class="rep-card" onclick="abrirModalConsulta(\'\',\'\',\'\',\'' + c.id + '\')">' +
