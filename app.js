@@ -657,6 +657,8 @@ function verReparacion(id) {
           '<div class="detail-header-sub">' + (cliente?cliente.nombre:'—') + ' · ' + (rep.numero||rep.id) + ' · Entrada: ' + rep.fechaEntrada + '</div>' +
         '</div>' +
         '<div class="detail-header-actions">' +
+          '<button class="btn-header" onclick="abrirModalPedido(\'\',\'' + rep.idReloj + '\',\'' + rep.id + '\',null)">+ Pedido</button>' +
+          '<button class="btn-header" onclick="abrirModalConsulta(\'\',\'' + rep.idReloj + '\',\'' + rep.id + '\',null)">+ Consulta</button>' +
           '<button class="btn-header" onclick="imprimirResguardoEntrada(\'' + rep.id + '\')">🖨 Resguardo</button>' +
           (rep.estado==='Entregada' ? '<button class="btn-header" onclick="imprimirTicketEntrega(\'' + rep.id + '\')">🖨 Entrega</button>' : '') +
           (rep.estado==='Lista para recoger' ? '<button class="btn-header" onclick="abrirModalEntrega(\'' + rep.id + '\')">📋 Entregar</button>' : '') +
@@ -687,8 +689,50 @@ function verReparacion(id) {
             '</div>' +
             '<span class="reloj-clase-badge">' + reloj.clase + '</span>' +
           '</div>' : '') +
+        htmlPedidosDeReparacion(rep.id) +
+        htmlConsultasDeReparacion(rep.id) +
       '</div>' +
     '</div>';
+}
+
+function htmlPedidosDeReparacion(idReparacion) {
+  var lista = pedidos.filter(function(p) { return p.idReparacion === idReparacion; });
+  var html = '<div class="subsection-title" style="margin-top:16px">Pedidos <small style="font-size:14px;font-weight:400;color:var(--text3)">(' + lista.length + ')</small>' +
+    '<button class="btn btn-secondary btn-sm" onclick="abrirModalPedido(\'\',\'\',\'' + idReparacion + '\',null)">+ Añadir</button></div>';
+  if (!lista.length) return html + '<div style="font-size:13px;color:var(--text3);padding:8px 0 16px">Sin pedidos asociados.</div>';
+  return html + lista.map(function(p) {
+    return '<div class="rep-card" onclick="abrirModalPedido(\'\',\'\',\'\',\'' + p.id + '\')">' +
+      '<div class="rep-card-header">' +
+        '<div>' +
+          '<div class="rep-card-title">' + (p.descripcion||'Sin descripción').substring(0,60) + '</div>' +
+          '<div class="rep-card-sub">' + (p.proveedor||'Sin proveedor') + (p.precio?' · '+p.precio+' €':'') + '</div>' +
+        '</div>' +
+        '<div class="rep-card-actions">' +
+          '<span class="badge ' + badgeEstadoPed(p.estado) + '">' + p.estado + '</span>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function htmlConsultasDeReparacion(idReparacion) {
+  var lista = consultas.filter(function(c) { return c.idReparacion === idReparacion; });
+  var html = '<div class="subsection-title" style="margin-top:8px">Consultas <small style="font-size:14px;font-weight:400;color:var(--text3)">(' + lista.length + ')</small>' +
+    '<button class="btn btn-secondary btn-sm" onclick="abrirModalConsulta(\'\',\'\',\'' + idReparacion + '\',null)">+ Añadir</button></div>';
+  if (!lista.length) return html + '<div style="font-size:13px;color:var(--text3);padding:8px 0 16px">Sin consultas asociadas.</div>';
+  return html + lista.map(function(c) {
+    return '<div class="rep-card" onclick="abrirModalConsulta(\'\',\'\',\'\',\'' + c.id + '\')">' +
+      '<div class="rep-card-header">' +
+        '<div>' +
+          '<div class="rep-card-title">' + (c.asunto||'Sin asunto') + '</div>' +
+          '<div class="rep-card-sub">' + (c.descripcion||'').substring(0,60) + '</div>' +
+        '</div>' +
+        '<div class="rep-card-actions">' +
+          '<span class="badge ' + badgeEstadoCon(c.estado) + '">' + c.estado + '</span>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
 }
 
 function volverAReparaciones() {
