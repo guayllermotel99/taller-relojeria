@@ -636,6 +636,17 @@
   .rep-card-meta { font-size:12px; color:var(--text3); font-family:var(--font-mono); margin-top:6px; }
   .rep-card-actions { display:flex; gap:6px; flex-shrink:0; flex-wrap:wrap; justify-content:flex-end; }
 
+  /* ESTADO PEDIDOS */
+  .badge-ped-pendiente { background:#F0EDE6; color:#5C5748; }
+  .badge-ped-pedido    { background:#EEF1F9; color:#3A4E8C; }
+  .badge-ped-recibido  { background:#E8F0EC; color:#2B4D3F; }
+  .badge-ped-cancelado { background:#F5EAEA; color:#8B2E2E; }
+
+  /* ESTADO CONSULTAS */
+  .badge-con-abierta    { background:#FFF0E0; color:#B05A10; }
+  .badge-con-respondida { background:#E8F0EC; color:#2B4D3F; }
+  .badge-con-cerrada    { background:#F0F0F0; color:#666; }
+
   /* RESPONSIVE */
   @media (max-width: 600px) {
     main { padding: 16px; }
@@ -676,8 +687,8 @@
     <button class="nav-tab active" onclick="showPanel('clientes')">Clientes</button>
     <button class="nav-tab" onclick="showPanel('relojes')">Relojes</button>
     <button class="nav-tab" onclick="showPanel('reparaciones')">Reparaciones</button>
-    <button class="nav-tab" onclick="showPanel('pedidos')" style="opacity:0.5;pointer-events:none">Pedidos</button>
-    <button class="nav-tab" onclick="showPanel('consultas')" style="opacity:0.5;pointer-events:none">Consultas</button>
+    <button class="nav-tab" onclick="showPanel('pedidos')">Pedidos</button>
+    <button class="nav-tab" onclick="showPanel('consultas')">Consultas</button>
   </nav>
 
   <main>
@@ -738,6 +749,51 @@
         </div>
       </div>
       <div id="reparaciones-detail-view" style="display:none"></div>
+    </div>
+
+    <!-- PANEL PEDIDOS -->
+    <div id="panel-pedidos" class="panel">
+      <div id="pedidos-list-view">
+        <div class="section-header">
+          <div class="section-title">Pedidos</div>
+          <button class="btn btn-primary" onclick="abrirModalPedido(null,null,null,null)">+ Nuevo pedido</button>
+        </div>
+        <div class="search-bar">
+          <input type="text" class="search-input" placeholder="Buscar por descripción, cliente o proveedor..." id="search-pedidos" oninput="filtrarPedidos()">
+          <select class="form-select" style="width:180px;flex-shrink:0" id="filtro-estado-ped" onchange="filtrarPedidos()">
+            <option value="">Todos los estados</option>
+            <option>Pendiente</option>
+            <option>Pedido</option>
+            <option>Recibido</option>
+            <option>Cancelado</option>
+          </select>
+        </div>
+        <div class="list-container" id="lista-pedidos">
+          <div class="loading"><span class="spinner"></span> Cargando pedidos...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PANEL CONSULTAS -->
+    <div id="panel-consultas" class="panel">
+      <div id="consultas-list-view">
+        <div class="section-header">
+          <div class="section-title">Consultas</div>
+          <button class="btn btn-primary" onclick="abrirModalConsulta(null,null,null,null)">+ Nueva consulta</button>
+        </div>
+        <div class="search-bar">
+          <input type="text" class="search-input" placeholder="Buscar por asunto o cliente..." id="search-consultas" oninput="filtrarConsultas()">
+          <select class="form-select" style="width:180px;flex-shrink:0" id="filtro-estado-con" onchange="filtrarConsultas()">
+            <option value="">Todos los estados</option>
+            <option>Abierta</option>
+            <option>Respondida</option>
+            <option>Cerrada</option>
+          </select>
+        </div>
+        <div class="list-container" id="lista-consultas">
+          <div class="loading"><span class="spinner"></span> Cargando consultas...</div>
+        </div>
+      </div>
     </div>
   </main>
 </div>
@@ -1062,6 +1118,154 @@
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="cerrarModal('modal-entrega')">Cancelar</button>
       <button class="btn btn-primary" onclick="confirmarEntrega()">Confirmar entrega</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL PEDIDO -->
+<div class="modal-overlay" id="modal-pedido">
+  <div class="modal" style="max-width:600px">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-pedido-title">Nuevo pedido</div>
+      <button class="modal-close" onclick="cerrarModal('modal-pedido')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <!-- Asociaciones opcionales -->
+        <div class="form-group full">
+          <label class="form-label">Cliente</label>
+          <div style="display:flex;gap:8px;align-items:center">
+            <div style="flex:1;position:relative">
+              <input type="text" class="form-input" id="ped-cliente-search" placeholder="Buscar cliente (opcional)..." oninput="filtrarClientesModalPed()" autocomplete="off">
+              <div id="ped-cliente-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-lg);z-index:50;max-height:180px;overflow-y:auto;margin-top:4px"></div>
+              <input type="hidden" id="ped-cliente">
+            </div>
+          </div>
+          <div id="ped-cliente-pill" style="display:none;margin-top:6px;font-size:13px;color:var(--accent);padding:4px 8px;background:var(--accent-light);border-radius:var(--radius);display:flex;align-items:center;justify-content:space-between">
+            <span id="ped-cliente-pill-nombre"></span>
+            <button type="button" onclick="limpiarClientePed()" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:14px;padding:0 2px">✕</button>
+          </div>
+        </div>
+        <div class="form-group full" id="ped-reloj-grupo" style="display:none">
+          <label class="form-label">Reloj asociado</label>
+          <select class="form-select" id="ped-reloj" onchange="actualizarRepsPed()">
+            <option value="">— Sin reloj —</option>
+          </select>
+        </div>
+        <div class="form-group full" id="ped-rep-grupo" style="display:none">
+          <label class="form-label">Reparación asociada</label>
+          <select class="form-select" id="ped-reparacion">
+            <option value="">— Sin reparación —</option>
+          </select>
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Descripción de la pieza *</label>
+          <textarea class="form-textarea" id="ped-descripcion" placeholder="¿Qué pieza o material necesitas?"></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Referencia / Marca</label>
+          <input type="text" class="form-input" id="ped-referencia" placeholder="Ref. del fabricante">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Proveedor</label>
+          <input type="text" class="form-input" id="ped-proveedor" placeholder="Nombre del proveedor">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Precio (€)</label>
+          <input type="number" class="form-input" id="ped-precio" placeholder="0.00" step="0.01" min="0">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Estado</label>
+          <select class="form-select" id="ped-estado">
+            <option>Pendiente</option>
+            <option>Pedido</option>
+            <option>Recibido</option>
+            <option>Cancelado</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Fecha del pedido</label>
+          <input type="date" class="form-input" id="ped-fecha-pedido">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Fecha estimada llegada</label>
+          <input type="date" class="form-input" id="ped-fecha-estimada">
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Notas</label>
+          <textarea class="form-textarea" id="ped-notas" placeholder="Observaciones adicionales..."></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="cerrarModal('modal-pedido')">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarPedido()">Guardar pedido</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL CONSULTA -->
+<div class="modal-overlay" id="modal-consulta">
+  <div class="modal" style="max-width:600px">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-consulta-title">Nueva consulta</div>
+      <button class="modal-close" onclick="cerrarModal('modal-consulta')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group full">
+          <label class="form-label">Cliente</label>
+          <div style="flex:1;position:relative">
+            <input type="text" class="form-input" id="con-cliente-search" placeholder="Buscar cliente (opcional)..." oninput="filtrarClientesModalCon()" autocomplete="off">
+            <div id="con-cliente-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-lg);z-index:50;max-height:180px;overflow-y:auto;margin-top:4px"></div>
+            <input type="hidden" id="con-cliente">
+          </div>
+          <div id="con-cliente-pill" style="display:none;margin-top:6px;font-size:13px;color:var(--accent);padding:4px 8px;background:var(--accent-light);border-radius:var(--radius);display:flex;align-items:center;justify-content:space-between">
+            <span id="con-cliente-pill-nombre"></span>
+            <button type="button" onclick="limpiarClienteCon()" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:14px;padding:0 2px">✕</button>
+          </div>
+        </div>
+        <div class="form-group full" id="con-reloj-grupo" style="display:none">
+          <label class="form-label">Reloj asociado</label>
+          <select class="form-select" id="con-reloj" onchange="actualizarRepsCon()">
+            <option value="">— Sin reloj —</option>
+          </select>
+        </div>
+        <div class="form-group full" id="con-rep-grupo" style="display:none">
+          <label class="form-label">Reparación asociada</label>
+          <select class="form-select" id="con-reparacion">
+            <option value="">— Sin reparación —</option>
+          </select>
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Asunto *</label>
+          <input type="text" class="form-input" id="con-asunto" placeholder="Tema de la consulta">
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Descripción</label>
+          <textarea class="form-textarea" id="con-descripcion" placeholder="Detalle de la consulta..."></textarea>
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Respuesta</label>
+          <textarea class="form-textarea" id="con-respuesta" placeholder="Respuesta o resolución..."></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Estado</label>
+          <select class="form-select" id="con-estado">
+            <option>Abierta</option>
+            <option>Respondida</option>
+            <option>Cerrada</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Fecha</label>
+          <input type="date" class="form-input" id="con-fecha">
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="cerrarModal('modal-consulta')">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarConsulta()">Guardar consulta</button>
     </div>
   </div>
 </div>

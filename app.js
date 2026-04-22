@@ -163,7 +163,7 @@ async function inicializarHojas() {
 // CARGAR DATOS
 // ============================================================
 async function cargarTodo() {
-  await Promise.all([cargarClientes(), cargarRelojes(), cargarReparaciones()]);
+  await Promise.all([cargarClientes(), cargarRelojes(), cargarReparaciones(), cargarPedidos(), cargarConsultas()]);
 }
 
 async function cargarClientes() {
@@ -1346,12 +1346,383 @@ function toast(msg, tipo) {
 document.addEventListener('click', function(e) {
   if (e.target.classList.contains('modal-overlay')) e.target.classList.remove('open');
   if (e.target.id === 'confirm-overlay') cerrarConfirm();
-  // Cerrar dropdown de cliente si se hace click fuera
-  if (!e.target.closest('#rep-cliente-search') && !e.target.closest('#rep-cliente-dropdown')) {
-    var dd = document.getElementById('rep-cliente-dropdown');
-    if (dd) dd.style.display = 'none';
-  }
+  // Cerrar dropdowns de cliente si se hace click fuera
+  ['rep-cliente-search','ped-cliente-search','con-cliente-search'].forEach(function(sid) {
+    var did = sid.replace('-search', '-dropdown');
+    if (!e.target.closest('#' + sid) && !e.target.closest('#' + did)) {
+      var dd = document.getElementById(did);
+      if (dd) dd.style.display = 'none';
+    }
+  });
 });
+
+// ============================================================
+// PEDIDOS
+// ============================================================
+var pedidos = [];
+var editandoPedidoId = null;
+
+async function cargarPedidos() {
+  var rows = await apiGet('Pedidos!A2:M');
+  pedidos = rows.map(function(r) { return {
+    id: r[0]||'', idCliente: r[1]||'', idReloj: r[2]||'', idReparacion: r[3]||'',
+    descripcion: r[4]||'', referencia: r[5]||'', proveedor: r[6]||'',
+    precio: r[7]||'', estado: r[8]||'Pendiente',
+    fechaPedido: r[9]||'', fechaEstimada: r[10]||'', fechaLlegada: r[11]||'',
+    notas: r[12]||''
+  }; });
+  renderizarListaPedidos(pedidos);
+}
+
+function badgeEstadoPed(estado) {
+  var map = { 'Pendiente': 'badge-ped-pendiente', 'Pedido': 'badge-ped-pedido', 'Recibido': 'badge-ped-recibido', 'Cancelado': 'badge-ped-cancelado' };
+  return map[estado] || 'badge-ped-pendiente';
+}
+
+function renderizarListaPedidos(lista) {
+  var el = document.getElementById('lista-pedidos');
+  if (!lista.length) {
+    el.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📦</div><div class="empty-state-text">No hay pedidos registrados.</div></div>';
+    return;
+  }
+  el.innerHTML = lista.map(function(p) {
+    var c   = p.idCliente   ? clientes.find(function(x) { return x.id === p.idCliente; })   : null;
+    var rel = p.idReloj     ? relojes.find(function(x)  { return x.id === p.idReloj; })     : null;
+    var rep = p.idReparacion? reparaciones.find(function(x){ return x.id === p.idReparacion; }) : null;
+    var contexto = [c?c.nombre:'', rel?nombreReloj(rel):'', rep?rep.numero:''].filter(Boolean).join(' · ');
+    return '<div class="list-item" onclick="abrirModalPedido(\'' + (p.idCliente||'') + '\',\'' + (p.idReloj||'') + '\',\'' + (p.idReparacion||'') + '\',\'' + p.id + '\')">' +
+      '<div class="list-item-main">' +
+        '<div class="list-item-name">' + (p.descripcion||'Sin descripción').substring(0,60) + '</div>' +
+        '<div class="list-item-sub">' + (contexto||'Sin asociar') + (p.proveedor?' · '+p.proveedor:'') + '</div>' +
+        '<div class="list-item-sub" style="margin-top:2px">' + (p.fechaPedido||'') + (p.precio?' · '+p.precio+' €':'') + '</div>' +
+      '</div>' +
+      '<div class="list-item-actions">' +
+        '<span class="badge ' + badgeEstadoPed(p.estado) + '">' + p.estado + '</span>' +
+        '<button class="btn btn-danger btn-sm" onclick="event.stopPropagation();confirmarEliminarPedido(\'' + p.id + '\')">✕</button>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function filtrarPedidos() {
+  var q  = document.getElementById('search-pedidos').value.toLowerCase();
+  var st = document.getElementById('filtro-estado-ped').value;
+  renderizarListaPedidos(pedidos.filter(function(p) {
+    var c = p.idCliente ? clientes.find(function(x) { return x.id === p.idCliente; }) : null;
+    var texto = [p.descripcion, p.proveedor, p.referencia, c?c.nombre:''].join(' ').toLowerCase();
+    return texto.includes(q) && (!st || p.estado === st);
+  }));
+}
+
+// Buscador de cliente en modal pedido
+function filtrarClientesModalPed() {
+  filtrarClientesDropdown('ped-cliente-search', 'ped-cliente-dropdown', function(c) {
+    seleccionarClientePed(c.id, c.nombre);
+  });
+}
+
+function seleccionarClientePed(id, nombre) {
+  document.getElementById('ped-cliente').value = id;
+  document.getElementById('ped-cliente-search').value = '';
+  document.getElementById('ped-cliente-dropdown').style.display = 'none';
+  var pill = document.getElementById('ped-cliente-pill');
+  pill.style.display = 'flex';
+  document.getElementById('ped-cliente-pill-nombre').textContent = nombre;
+  // Cargar relojes del cliente
+  var relojesC = relojes.filter(function(r) { return r.idCliente === id; });
+  var selRel = document.getElementById('ped-reloj');
+  selRel.innerHTML = '<option value="">— Sin reloj —</option>' +
+    relojesC.map(function(r) { return '<option value="' + r.id + '">' + nombreReloj(r) + '</option>'; }).join('');
+  document.getElementById('ped-reloj-grupo').style.display = 'block';
+  document.getElementById('ped-rep-grupo').style.display = 'none';
+  document.getElementById('ped-reparacion').innerHTML = '<option value="">— Sin reparación —</option>';
+}
+
+function limpiarClientePed() {
+  document.getElementById('ped-cliente').value = '';
+  document.getElementById('ped-cliente-search').value = '';
+  document.getElementById('ped-cliente-dropdown').style.display = 'none';
+  document.getElementById('ped-cliente-pill').style.display = 'none';
+  document.getElementById('ped-reloj-grupo').style.display = 'none';
+  document.getElementById('ped-rep-grupo').style.display = 'none';
+}
+
+function actualizarRepsPed() {
+  var idReloj = document.getElementById('ped-reloj').value;
+  var selRep = document.getElementById('ped-reparacion');
+  if (!idReloj) {
+    document.getElementById('ped-rep-grupo').style.display = 'none';
+    return;
+  }
+  var repsReloj = reparaciones.filter(function(r) { return r.idReloj === idReloj; });
+  selRep.innerHTML = '<option value="">— Sin reparación —</option>' +
+    repsReloj.map(function(r) { return '<option value="' + r.id + '">' + (r.numero||r.id) + ' · ' + (r.problema||'').substring(0,40) + '</option>'; }).join('');
+  document.getElementById('ped-rep-grupo').style.display = 'block';
+}
+
+function abrirModalPedido(idCliente, idReloj, idReparacion, idPedido) {
+  idCliente    = idCliente    || null;
+  idReloj      = idReloj      || null;
+  idReparacion = idReparacion || null;
+  idPedido     = idPedido     || null;
+  editandoPedidoId = idPedido;
+
+  var p = idPedido ? pedidos.find(function(x) { return x.id === idPedido; }) : null;
+  document.getElementById('modal-pedido-title').textContent = p ? 'Editar pedido' : 'Nuevo pedido';
+
+  // Limpiar
+  limpiarClientePed();
+  document.getElementById('ped-descripcion').value   = p ? p.descripcion : '';
+  document.getElementById('ped-referencia').value    = p ? p.referencia  : '';
+  document.getElementById('ped-proveedor').value     = p ? p.proveedor   : '';
+  document.getElementById('ped-precio').value        = p ? p.precio      : '';
+  document.getElementById('ped-estado').value        = p ? p.estado      : 'Pendiente';
+  document.getElementById('ped-fecha-pedido').value  = p ? p.fechaPedido : new Date().toISOString().split('T')[0];
+  document.getElementById('ped-fecha-estimada').value= p ? p.fechaEstimada : '';
+  document.getElementById('ped-notas').value         = p ? p.notas       : '';
+
+  // Preseleccionar contexto
+  var cid = p ? p.idCliente : idCliente;
+  if (cid) {
+    var c = clientes.find(function(x) { return x.id === cid; });
+    if (c) seleccionarClientePed(c.id, c.nombre);
+    var rid = p ? p.idReloj : idReloj;
+    if (rid) {
+      document.getElementById('ped-reloj').value = rid;
+      actualizarRepsPed();
+      var repid = p ? p.idReparacion : idReparacion;
+      if (repid) document.getElementById('ped-reparacion').value = repid;
+    }
+  }
+
+  abrirModal('modal-pedido');
+}
+
+async function guardarPedido() {
+  var desc = val('ped-descripcion');
+  if (!desc) { toast('La descripción es obligatoria', 'error'); return; }
+  var idCliente    = document.getElementById('ped-cliente').value    || '';
+  var idReloj      = document.getElementById('ped-reloj').value      || '';
+  var idReparacion = document.getElementById('ped-reparacion').value || '';
+  var referencia   = val('ped-referencia'), proveedor = val('ped-proveedor');
+  var precio       = val('ped-precio'), estado = val('ped-estado');
+  var fechaPedido  = document.getElementById('ped-fecha-pedido').value  || '';
+  var fechaEst     = document.getElementById('ped-fecha-estimada').value || '';
+  var notas        = val('ped-notas');
+
+  if (editandoPedidoId) {
+    var idx = pedidos.findIndex(function(p) { return p.id === editandoPedidoId; });
+    await apiUpdate('Pedidos!A' + (idx+2) + ':M' + (idx+2), [editandoPedidoId, idCliente, idReloj, idReparacion, desc, referencia, proveedor, precio, estado, fechaPedido, fechaEst, '', notas]);
+    pedidos[idx] = { id: editandoPedidoId, idCliente: idCliente, idReloj: idReloj, idReparacion: idReparacion, descripcion: desc, referencia: referencia, proveedor: proveedor, precio: precio, estado: estado, fechaPedido: fechaPedido, fechaEstimada: fechaEst, fechaLlegada: '', notas: notas };
+    toast('Pedido actualizado', 'success');
+  } else {
+    var id = uid();
+    await apiAppend('Pedidos', [id, idCliente, idReloj, idReparacion, desc, referencia, proveedor, precio, estado, fechaPedido, fechaEst, '', notas]);
+    pedidos.push({ id: id, idCliente: idCliente, idReloj: idReloj, idReparacion: idReparacion, descripcion: desc, referencia: referencia, proveedor: proveedor, precio: precio, estado: estado, fechaPedido: fechaPedido, fechaEstimada: fechaEst, fechaLlegada: '', notas: notas });
+    toast('Pedido creado', 'success');
+  }
+  cerrarModal('modal-pedido');
+  renderizarListaPedidos(pedidos);
+}
+
+function confirmarEliminarPedido(id) {
+  mostrarConfirm('¿Eliminar pedido?', 'Esta acción no se puede deshacer.', async function() {
+    await eliminarFilaPorId('Pedidos', id);
+    pedidos = pedidos.filter(function(p) { return p.id !== id; });
+    renderizarListaPedidos(pedidos);
+    toast('Pedido eliminado', 'success');
+  });
+}
+
+// ============================================================
+// CONSULTAS
+// ============================================================
+var consultas = [];
+var editandoConsultaId = null;
+
+async function cargarConsultas() {
+  var rows = await apiGet('Consultas!A2:I');
+  consultas = rows.map(function(r) { return {
+    id: r[0]||'', idCliente: r[1]||'', idReloj: r[2]||'', idReparacion: r[3]||'',
+    asunto: r[4]||'', descripcion: r[5]||'', respuesta: r[6]||'',
+    estado: r[7]||'Abierta', fecha: r[8]||''
+  }; });
+  renderizarListaConsultas(consultas);
+}
+
+function badgeEstadoCon(estado) {
+  var map = { 'Abierta': 'badge-con-abierta', 'Respondida': 'badge-con-respondida', 'Cerrada': 'badge-con-cerrada' };
+  return map[estado] || 'badge-con-abierta';
+}
+
+function renderizarListaConsultas(lista) {
+  var el = document.getElementById('lista-consultas');
+  if (!lista.length) {
+    el.innerHTML = '<div class="empty-state"><div class="empty-state-icon">💬</div><div class="empty-state-text">No hay consultas registradas.</div></div>';
+    return;
+  }
+  el.innerHTML = lista.map(function(c) {
+    var cli = c.idCliente ? clientes.find(function(x) { return x.id === c.idCliente; }) : null;
+    var rel = c.idReloj   ? relojes.find(function(x)  { return x.id === c.idReloj; })   : null;
+    var rep = c.idReparacion ? reparaciones.find(function(x) { return x.id === c.idReparacion; }) : null;
+    var contexto = [cli?cli.nombre:'', rel?nombreReloj(rel):'', rep?rep.numero:''].filter(Boolean).join(' · ');
+    return '<div class="list-item" onclick="abrirModalConsulta(\'' + (c.idCliente||'') + '\',\'' + (c.idReloj||'') + '\',\'' + (c.idReparacion||'') + '\',\'' + c.id + '\')">' +
+      '<div class="list-item-main">' +
+        '<div class="list-item-name">' + (c.asunto||'Sin asunto') + '</div>' +
+        '<div class="list-item-sub">' + (contexto||'Sin asociar') + '</div>' +
+        '<div class="list-item-sub" style="margin-top:2px">' + (c.fecha||'') + (c.descripcion?' · '+(c.descripcion).substring(0,40):'') + '</div>' +
+      '</div>' +
+      '<div class="list-item-actions">' +
+        '<span class="badge ' + badgeEstadoCon(c.estado) + '">' + c.estado + '</span>' +
+        '<button class="btn btn-danger btn-sm" onclick="event.stopPropagation();confirmarEliminarConsulta(\'' + c.id + '\')">✕</button>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function filtrarConsultas() {
+  var q  = document.getElementById('search-consultas').value.toLowerCase();
+  var st = document.getElementById('filtro-estado-con').value;
+  renderizarListaConsultas(consultas.filter(function(c) {
+    var cli = c.idCliente ? clientes.find(function(x) { return x.id === c.idCliente; }) : null;
+    var texto = [c.asunto, c.descripcion, cli?cli.nombre:''].join(' ').toLowerCase();
+    return texto.includes(q) && (!st || c.estado === st);
+  }));
+}
+
+// Buscador de cliente en modal consulta
+function filtrarClientesModalCon() {
+  filtrarClientesDropdown('con-cliente-search', 'con-cliente-dropdown', function(c) {
+    seleccionarClienteCon(c.id, c.nombre);
+  });
+}
+
+function seleccionarClienteCon(id, nombre) {
+  document.getElementById('con-cliente').value = id;
+  document.getElementById('con-cliente-search').value = '';
+  document.getElementById('con-cliente-dropdown').style.display = 'none';
+  var pill = document.getElementById('con-cliente-pill');
+  pill.style.display = 'flex';
+  document.getElementById('con-cliente-pill-nombre').textContent = nombre;
+  var relojesC = relojes.filter(function(r) { return r.idCliente === id; });
+  var selRel = document.getElementById('con-reloj');
+  selRel.innerHTML = '<option value="">— Sin reloj —</option>' +
+    relojesC.map(function(r) { return '<option value="' + r.id + '">' + nombreReloj(r) + '</option>'; }).join('');
+  document.getElementById('con-reloj-grupo').style.display = 'block';
+  document.getElementById('con-rep-grupo').style.display = 'none';
+}
+
+function limpiarClienteCon() {
+  document.getElementById('con-cliente').value = '';
+  document.getElementById('con-cliente-search').value = '';
+  document.getElementById('con-cliente-dropdown').style.display = 'none';
+  document.getElementById('con-cliente-pill').style.display = 'none';
+  document.getElementById('con-reloj-grupo').style.display = 'none';
+  document.getElementById('con-rep-grupo').style.display = 'none';
+}
+
+function actualizarRepsCon() {
+  var idReloj = document.getElementById('con-reloj').value;
+  var selRep = document.getElementById('con-reparacion');
+  if (!idReloj) { document.getElementById('con-rep-grupo').style.display = 'none'; return; }
+  var repsReloj = reparaciones.filter(function(r) { return r.idReloj === idReloj; });
+  selRep.innerHTML = '<option value="">— Sin reparación —</option>' +
+    repsReloj.map(function(r) { return '<option value="' + r.id + '">' + (r.numero||r.id) + ' · ' + (r.problema||'').substring(0,40) + '</option>'; }).join('');
+  document.getElementById('con-rep-grupo').style.display = 'block';
+}
+
+function abrirModalConsulta(idCliente, idReloj, idReparacion, idConsulta) {
+  idCliente    = idCliente    || null;
+  idReloj      = idReloj      || null;
+  idReparacion = idReparacion || null;
+  idConsulta   = idConsulta   || null;
+  editandoConsultaId = idConsulta;
+
+  var c = idConsulta ? consultas.find(function(x) { return x.id === idConsulta; }) : null;
+  document.getElementById('modal-consulta-title').textContent = c ? 'Editar consulta' : 'Nueva consulta';
+
+  limpiarClienteCon();
+  document.getElementById('con-asunto').value      = c ? c.asunto      : '';
+  document.getElementById('con-descripcion').value = c ? c.descripcion : '';
+  document.getElementById('con-respuesta').value   = c ? c.respuesta   : '';
+  document.getElementById('con-estado').value      = c ? c.estado      : 'Abierta';
+  document.getElementById('con-fecha').value       = c ? c.fecha : new Date().toISOString().split('T')[0];
+
+  var cid = c ? c.idCliente : idCliente;
+  if (cid) {
+    var cli = clientes.find(function(x) { return x.id === cid; });
+    if (cli) seleccionarClienteCon(cli.id, cli.nombre);
+    var rid = c ? c.idReloj : idReloj;
+    if (rid) {
+      document.getElementById('con-reloj').value = rid;
+      actualizarRepsCon();
+      var repid = c ? c.idReparacion : idReparacion;
+      if (repid) document.getElementById('con-reparacion').value = repid;
+    }
+  }
+
+  abrirModal('modal-consulta');
+}
+
+async function guardarConsulta() {
+  var asunto = val('con-asunto');
+  if (!asunto) { toast('El asunto es obligatorio', 'error'); return; }
+  var idCliente    = document.getElementById('con-cliente').value    || '';
+  var idReloj      = document.getElementById('con-reloj').value      || '';
+  var idReparacion = document.getElementById('con-reparacion').value || '';
+  var descripcion  = val('con-descripcion'), respuesta = val('con-respuesta');
+  var estado       = val('con-estado');
+  var fecha        = document.getElementById('con-fecha').value || '';
+
+  if (editandoConsultaId) {
+    var idx = consultas.findIndex(function(c) { return c.id === editandoConsultaId; });
+    await apiUpdate('Consultas!A' + (idx+2) + ':I' + (idx+2), [editandoConsultaId, idCliente, idReloj, idReparacion, asunto, descripcion, respuesta, estado, fecha]);
+    consultas[idx] = { id: editandoConsultaId, idCliente: idCliente, idReloj: idReloj, idReparacion: idReparacion, asunto: asunto, descripcion: descripcion, respuesta: respuesta, estado: estado, fecha: fecha };
+    toast('Consulta actualizada', 'success');
+  } else {
+    var id = uid();
+    await apiAppend('Consultas', [id, idCliente, idReloj, idReparacion, asunto, descripcion, respuesta, estado, fecha]);
+    consultas.push({ id: id, idCliente: idCliente, idReloj: idReloj, idReparacion: idReparacion, asunto: asunto, descripcion: descripcion, respuesta: respuesta, estado: estado, fecha: fecha });
+    toast('Consulta creada', 'success');
+  }
+  cerrarModal('modal-consulta');
+  renderizarListaConsultas(consultas);
+}
+
+function confirmarEliminarConsulta(id) {
+  mostrarConfirm('¿Eliminar consulta?', 'Esta acción no se puede deshacer.', async function() {
+    await eliminarFilaPorId('Consultas', id);
+    consultas = consultas.filter(function(c) { return c.id !== id; });
+    renderizarListaConsultas(consultas);
+    toast('Consulta eliminada', 'success');
+  });
+}
+
+// ============================================================
+// HELPER GENERICO — buscador de cliente en dropdown
+// ============================================================
+function filtrarClientesDropdown(inputId, dropdownId, onSelect) {
+  var q = document.getElementById(inputId).value.toLowerCase().trim();
+  var dropdown = document.getElementById(dropdownId);
+  if (!q) { dropdown.style.display = 'none'; return; }
+  var filtrados = clientes.filter(function(c) {
+    return c.nombre.toLowerCase().includes(q) || c.telefono.includes(q) || c.dni.toLowerCase().includes(q);
+  }).slice(0, 8);
+  if (!filtrados.length) {
+    dropdown.innerHTML = '<div style="padding:10px 14px;font-size:13px;color:var(--text3)">Sin resultados</div>';
+  } else {
+    dropdown.innerHTML = filtrados.map(function(c) {
+      return '<div style="padding:10px 14px;cursor:pointer;font-size:14px;border-bottom:1px solid var(--border)" onmouseover="this.style.background=\'var(--bg2)\'" onmouseout="this.style.background=\'\'" onclick="(function(){' +
+        'document.getElementById(\'' + dropdownId + '\').style.display=\'none\';' +
+        '})();window._dropdownCb_' + dropdownId + '(' + JSON.stringify(c) + ')">' +
+        '<div style="font-weight:500">' + c.nombre + '</div>' +
+        '<div style="font-size:12px;color:var(--text3);font-family:var(--font-mono)">' + (c.telefono||'') + (c.dni?' · '+c.dni:'') + '</div>' +
+      '</div>';
+    }).join('');
+  }
+  window['_dropdownCb_' + dropdownId] = onSelect;
+  dropdown.style.display = 'block';
+}
 
 // ============================================================
 // INIT
