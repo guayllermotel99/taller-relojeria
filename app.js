@@ -1343,13 +1343,40 @@ function confirmarEliminarReloj(id, marca) {
 }
 
 function confirmarEliminarReparacion(id) {
-  mostrarConfirm('¿Eliminar reparación?', 'Se eliminará esta reparación. Esta acción no se puede deshacer.', async function() {
-    await eliminarFilaPorId('Reparaciones', id);
-    reparaciones = reparaciones.filter(function(r) { return r.id !== id; });
-    renderizarListaReparaciones(reparaciones);
-    if (reparacionActivaId === id) volverAReparaciones();
-    toast('Reparación eliminada', 'success');
-  });
+  var pedidosAsoc   = pedidos.filter(function(p)  { return p.idReparacion === id; });
+  var consultasAsoc = consultas.filter(function(c) { return c.idReparacion === id; });
+  var extra = '';
+  if (pedidosAsoc.length || consultasAsoc.length) {
+    extra = ' También se eliminarán ' +
+      [pedidosAsoc.length   ? pedidosAsoc.length   + ' pedido(s)'   : '',
+       consultasAsoc.length ? consultasAsoc.length + ' consulta(s)' : '']
+      .filter(Boolean).join(' y ') + ' asociados.';
+  }
+  mostrarConfirm('¿Eliminar reparación?',
+    'Esta acción no se puede deshacer.' + extra,
+    async function() {
+      // Eliminar pedidos asociados
+      for (var i = 0; i < pedidosAsoc.length; i++) {
+        await eliminarFilaPorId('Pedidos', pedidosAsoc[i].id);
+      }
+      pedidos = pedidos.filter(function(p) { return p.idReparacion !== id; });
+
+      // Eliminar consultas asociadas
+      for (var j = 0; j < consultasAsoc.length; j++) {
+        await eliminarFilaPorId('Consultas', consultasAsoc[j].id);
+      }
+      consultas = consultas.filter(function(c) { return c.idReparacion !== id; });
+
+      // Eliminar la reparación
+      await eliminarFilaPorId('Reparaciones', id);
+      reparaciones = reparaciones.filter(function(r) { return r.id !== id; });
+
+      renderizarListaReparaciones(reparaciones);
+      renderizarListaPedidos(pedidos);
+      renderizarListaConsultas(consultas);
+      if (reparacionActivaId === id) volverAReparaciones();
+      toast('Reparación eliminada', 'success');
+    });
 }
 
 async function eliminarFilaPorId(hoja, id) {
